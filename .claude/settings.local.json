@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build)",
+      "Bash(rm -f src/ContextMaster.Core/Services/*.cs)",
+      "Bash(rm -f src/ContextMaster.Core/ViewModels/*.cs)",
+      "Bash(rm -f src/ContextMaster.Data/*.cs)"
+    ]
+  }
+}

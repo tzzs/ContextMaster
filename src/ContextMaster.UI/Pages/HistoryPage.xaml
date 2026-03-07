@@ -1,0 +1,163 @@
+<Page
+    x:Class="ContextMaster.UI.Pages.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:ContextMaster.UI.Pages"
+    xmlns:controls="using:ContextMaster.UI.Controls"
+    mc:Ignorable="d"
+    Background="{StaticResource BackgroundColorBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 工具栏区域 -->
+        <Border
+            Grid.Row="0"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="{StaticResource Spacing16Thickness}">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 标题 -->
+                <TextBlock
+                    Grid.Column="0"
+                    Style="{StaticResource TitleTextStyle}"
+                    Text="操作记录"
+                    VerticalAlignment="Center" />
+
+                <!-- 筛选按钮组 -->
+                <StackPanel
+                    Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="16,0,0,0">
+                    <Button
+                        Content="全部"
+                        Style="{StaticResource TextButtonStyle}"
+                        Height="28"
+                        Padding="12,0"
+                        CornerRadius="{StaticResource RadiusSm}"
+                        Margin="0,0,8,0" />
+                    <Button
+                        Content="启用"
+                        Style="{StaticResource TextButtonStyle}"
+                        Height="28"
+                        Padding="12,0"
+                        CornerRadius="{StaticResource RadiusSm}"
+                        Margin="0,0,8,0" />
+                    <Button
+                        Content="禁用"
+                        Style="{StaticResource TextButtonStyle}"
+                        Height="28"
+                        Padding="12,0"
+                        CornerRadius="{StaticResource RadiusSm}" />
+                </StackPanel>
+
+                <!-- 操作按钮 -->
+                <StackPanel
+                    Grid.Column="2"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center">
+                    <Button
+                        Content="导出CSV"
+                        Background="{StaticResource Surface2Brush}"
+                        Foreground="{StaticResource TextPrimaryBrush}"
+                        BorderThickness="1"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        Height="32"
+                        Padding="12,0"
+                        CornerRadius="{StaticResource RadiusSm}"
+                        Margin="0,0,8,0" />
+                    <Button
+                        Content="清除全部"
+                        Background="{StaticResource DangerBackgroundBrush}"
+                        Foreground="{StaticResource DangerBrush}"
+                        BorderThickness="0"
+                        Height="32"
+                        Padding="12,0"
+                        CornerRadius="{StaticResource RadiusSm}" />
+                </StackPanel>
+            </Grid>
+
+        </Border>
+
+        <!-- 列表区域 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ListView
+                x:Name="HistoryListView"
+                Padding="{StaticResource Spacing16Thickness}"
+                SelectionMode="Single">
+
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border
+                            Background="{StaticResource SurfaceBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusMd}"
+                            Padding="{StaticResource Spacing12Thickness}"
+                            Margin="0,0,0,8">
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 时间 -->
+                                <TextBlock
+                                    Grid.Column="0"
+                                    Style="{StaticResource CaptionTextStyle}"
+                                    Text="{Binding FormattedTimestamp}"
+                                    Width="140"
+                                    VerticalAlignment="Center" />
+
+                                <!-- 操作信息 -->
+                                <StackPanel Grid.Column="1" Margin="8,0">
+                                    <TextBlock
+                                        Style="{StaticResource BodyTextStyle}"
+                                        Text="{Binding TargetEntryName}" />
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextStyle}"
+                                        Text="{Binding OperationType}"
+                                        Margin="0,4,0,0" />
+                                </StackPanel>
+
+                                <!-- 操作按钮 -->
+                                <Button
+                                    Grid.Column="2"
+                                    Content="撤销"
+                                    Background="{StaticResource Surface2Brush}"
+                                    Foreground="{StaticResource TextPrimaryBrush}"
+                                    BorderThickness="1"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    Height="28"
+                                    Padding="8,0"
+                                    CornerRadius="{StaticResource RadiusSm}"
+                                    VerticalAlignment="Center" />
+
+                            </Grid>
+
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+
+            </ListView>
+        </ScrollViewer>
+
+    </Grid>
+
+</Page>

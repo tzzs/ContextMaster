@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.18362.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ContextMaster.UI</RootNamespace>
+    <AssemblyName>ContextMaster.UI</AssemblyName>
+    <UseWinUI>true</UseWinUI>
+    <Platforms>x64</Platforms>
+    <EnableMsixTooling>true</EnableMsixTooling>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240227000" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.2428" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ContextMaster.Core\ContextMaster.Core.csproj" />
+    <ProjectReference Include="..\ContextMaster.Data\ContextMaster.Data.csproj" />
+  </ItemGroup>
+
+</Project>

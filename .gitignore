@@ -1,0 +1,50 @@
+# ContextMaster 项目忽略文件
+
+# 编译输出
+bin/
+obj/
+*.suo
+*.user
+*.sln.docstates
+
+# NuGet 包
+packages/
+*.nupkg
+.nuget/
+
+# 测试结果
+TestResults/
+*.trx
+
+# 日志文件
+*.log
+*.txt
+
+# 临时文件
+*.tmp
+*.temp
+
+# 环境变量文件
+*.env
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+
+# 调试符号文件
+*.pdb
+*.vshost.exe
+
+# 编辑器文件夹和文件
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+
+# Windows 文件
+Thumbs.db
+Desktop.ini
+
+# macOS 文件
+.DS_Store

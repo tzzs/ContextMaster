@@ -24,7 +24,7 @@ public sealed partial class MenuItemCard : UserControl
             typeof(MenuItemCard),
             new PropertyMetadata(string.Empty));
 
-    public static readonly DependencyProperty IsEnabledProperty =
+    public static new readonly DependencyProperty IsEnabledProperty =
         DependencyProperty.Register(
             nameof(IsEnabled),
             typeof(bool),
@@ -64,7 +64,7 @@ public sealed partial class MenuItemCard : UserControl
         set => SetValue(SourceProperty, value);
     }
 
-    public bool IsEnabled
+    public new bool IsEnabled
     {
         get => (bool)GetValue(IsEnabledProperty);
         set => SetValue(IsEnabledProperty, value);

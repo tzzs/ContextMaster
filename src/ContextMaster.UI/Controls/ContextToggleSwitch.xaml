@@ -8,9 +8,10 @@
     mc:Ignorable="d">
 
     <Grid
+        x:Name="RootGrid"
         Width="40"
         Height="20"
-        Background="{Binding ElementName=RootControl, Path=TrackBackground}"
+        Background="{x:Bind TrackBackground, Mode=OneWay}"
         CornerRadius="{StaticResource RadiusFull}"
         PointerPressed="RootGrid_PointerPressed">
 
@@ -23,9 +24,6 @@
             <Ellipse.RenderTransform>
                 <TranslateTransform x:Name="ThumbTransform" />
             </Ellipse.RenderTransform>
-            <Ellipse.Resources>
-                <DropShadow x:Key="ThumbShadow" OffsetX="0" OffsetY="2" BlurRadius="4" Color="#000000" Opacity="0.3" />
-            </Ellipse.Resources>
         </Ellipse>
 
     </Grid>

@@ -8,8 +8,8 @@
     <CornerRadius x:Key="RadiusLg">12</CornerRadius>
     <CornerRadius x:Key="RadiusFull">100</CornerRadius>
 
-    <!-- 阴影效果 -->
-    <Shadow x:Key="ShadowSm">
+    <!-- 阴影效果 - 暂时注释掉，因为 WinUI 3 XamlCompiler 可能无法解析 -->
+    <!-- <Shadow x:Key="ShadowSm">
         <Shadow.Shadow>
             <DropShadow Color="#000000" Opacity="0.08" BlurRadius="8" OffsetX="0" OffsetY="2" />
         </Shadow.Shadow>
@@ -19,7 +19,7 @@
         <Shadow.Shadow>
             <DropShadow Color="#000000" Opacity="0.12" BlurRadius="16" OffsetX="0" OffsetY="4" />
         </Shadow.Shadow>
-    </Shadow>
+    </Shadow> -->
 
     <!-- 动画时长 -->
     <x:Double x:Key="AnimationDurationFast">100</x:Double>
@@ -34,5 +34,15 @@
     <x:Double x:Key="IconSizeSm">16</x:Double>
     <x:Double x:Key="IconSizeMd">20</x:Double>
     <x:Double x:Key="IconSizeLg">24</x:Double>
+
+    <!-- 文本按钮样式（无背景，仅文字） -->
+    <Style x:Key="TextButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource Surface2Brush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
 
 </ResourceDictionary>

@@ -17,7 +17,8 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
-        _viewModel = new MainViewModel();
+        _viewModel = new MainViewModel(App.Current.MenuManagerService);
+        _ = _viewModel.LoadMenuItemsCommand.ExecuteAsync(null);
         LoadMenuItems();
     }
 
@@ -26,7 +27,7 @@ public sealed partial class MainPage : Page
         ItemsPanel.Children.Clear();
         _cardMap.Clear();
 
-        foreach (var item in _viewModel.MenuItems)
+        foreach (var item in _viewModel.GetFilteredMenuItems())
         {
             var card = CreateMenuItemCard(item);
             ItemsPanel.Children.Add(card);
@@ -53,10 +54,11 @@ public sealed partial class MainPage : Page
         return card;
     }
 
-    private void OnItemToggled(MenuItemEntry item, bool isEnabled)
+    private async void OnItemToggled(MenuItemEntry item, bool isEnabled)
     {
-        _viewModel.ToggleItem(item);
+        await _viewModel.ToggleItemCommand.ExecuteAsync(item);
         UpdateDetailPanel(item);
+        LoadMenuItems();
     }
 
     private void UpdateDetailPanel(MenuItemEntry item)
@@ -80,22 +82,25 @@ public sealed partial class MainPage : Page
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        var searchText = SearchBox.Text.Trim();
-        _viewModel.FilterItems(searchText);
+        _viewModel.SearchText = SearchBox.Text.Trim();
         LoadMenuItems();
     }
 
-    private void BatchEnableButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void BatchEnableButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        var selectedItems = GetSelectedItems();
-        _viewModel.BatchEnable(selectedItems);
+        _viewModel.SelectedItems.Clear();
+        foreach (var entry in GetSelectedItems())
+            _viewModel.SelectedItems.Add(entry);
+        await _viewModel.BatchEnableCommand.ExecuteAsync(null);
         LoadMenuItems();
     }
 
-    private void BatchDisableButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void BatchDisableButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        var selectedItems = GetSelectedItems();
-        _viewModel.BatchDisable(selectedItems);
+        _viewModel.SelectedItems.Clear();
+        foreach (var entry in GetSelectedItems())
+            _viewModel.SelectedItems.Add(entry);
+        await _viewModel.BatchDisableCommand.ExecuteAsync(null);
         LoadMenuItems();
     }
 

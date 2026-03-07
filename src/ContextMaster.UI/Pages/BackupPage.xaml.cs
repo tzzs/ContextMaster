@@ -10,13 +10,9 @@ public sealed partial class BackupPage : Page
     public BackupPage()
     {
         InitializeComponent();
-        _viewModel = new BackupViewModel();
-        LoadBackups();
-    }
-
-    private void LoadBackups()
-    {
-        _viewModel.LoadBackups();
-        BackupGridView.ItemsSource = _viewModel.BackupSnapshots;
+        var app = (App)Microsoft.UI.Xaml.Application.Current;
+        _viewModel = new BackupViewModel(app.BackupService);
+        _ = _viewModel.LoadBackupsCommand.ExecuteAsync(null);
+        BackupGridView.ItemsSource = _viewModel.Backups;
     }
 }

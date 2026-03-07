@@ -1,21 +1,33 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet sln ContextMaster.sln add \"src\\\\ContextMaster.UI\\\\ContextMaster.UI.csproj\")",
-      "Bash(dotnet build ContextMaster.sln)",
-      "Bash(dotnet build ContextMaster.UI.csproj)",
-      "Bash(dotnet build ContextMaster.sln -r win-x64 -p:RuntimeIdentifier=win-x64)",
-      "Bash(dotnet build ContextMaster.UI.csproj -r win-x64 -p:RuntimeIdentifier=win-x64)",
-      "Bash(dotnet clean)",
-      "Bash(dotnet build ContextMaster.sln -c Debug -p:Configuration=Debug)",
-      "Bash(\"C:\\\\Users\\\\tanzz\\\\.nuget\\\\packages\\\\microsoft.windowsappsdk\\\\1.5.240227000\\\\tools\\\\net6.0\\\\..\\\\net472\\\\XamlCompiler.exe\" \"obj\\\\x64\\\\Debug\\\\net8.0-windows10.0.18362.0\\\\input.json\" \"obj\\\\x64\\\\Debug\\\\net8.0-windows10.0.18362.0\\\\output.json\")",
-      "Bash(mkdir -p ContextMaster.UI.bak)",
-      "Bash(mv ContextMaster.UI/* ContextMaster.UI.bak/)",
-      "Bash(dotnet build -r win-x64 -p:RuntimeIdentifier=win-x64)",
-      "Bash(dotnet --version)",
-      "Bash(mv ContextMaster.UI.bak/* ContextMaster.UI/)",
-      "Bash(rmdir ContextMaster.UI.bak)",
-      "Bash(dotnet --list-sdks)"
+      "Bash(python3 -c \":*)",
+      "Bash(dotnet *)",
+      "Bash(grep *)",
+      "Bash(mkdir *)",
+      "Bash(mv src/*)",
+      "Bash(mv temp*)",
+      "Bash(cp *)",
+      "Bash(rm -rf src/ContextMaster.UI/obj src/ContextMaster.UI/bin)",
+      "Bash(dotnet build ContextMaster.sln -v diag)",
+      "Bash(dotnet build -c Debug -v normal)",
+      "Bash(dotnet build -c Debug)",
+      "Bash(\"C:/Users/tanzz/.nuget/packages/microsoft.windowsappsdk/1.5.240227000/tools/net6.0/../net472/XamlCompiler.exe\" \"src/ContextMaster.UI/obj/x64/Debug/net8.0-windows10.0.18362.0/input.json\" \"src/ContextMaster.UI/obj/x64/Debug/net8.0-windows10.0.18362.0/output.json\")",
+      "Bash(dotnet build -c Debug -v diag)",
+      "Bash(dotnet new list winui)",
+      "Bash(dotnet new search winui3)",
+      "Bash(cp -r temp_backup_ui/* src/ContextMaster.UI/)",
+      "Bash(\"C:/Users/tanzz/.nuget/packages/microsoft.windowsappsdk/1.5.240227000/tools/net6.0/../net472/XamlCompiler.exe\" /help)",
+      "Bash(python3 -c ':*)",
+      "Bash(mkdir -p temp)",
+      "Bash(mv Controls temp/)",
+      "Bash(mv Pages temp/)",
+      "Bash(rm -rf src/ContextMaster.UI)",
+      "Bash(mv src/ContextMaster.UI.backup src/ContextMaster.UI)",
+      "Bash(mv temp/Controls ./)",
+      "Bash(mv temp/Pages ./)",
+      "Bash(cp temp_backup_ui/MainWindow.xaml src/ContextMaster.UI/)",
+      "Bash(cp temp_backup_ui/MainWindow.xaml.cs src/ContextMaster.UI/)"
     ]
   }
 }

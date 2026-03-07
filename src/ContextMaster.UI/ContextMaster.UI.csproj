@@ -10,6 +10,9 @@
     <UseWinUI>true</UseWinUI>
     <Platforms>x64</Platforms>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- 未打包运行时必须自包含 Windows App SDK，否则会找不到 Microsoft.ui.xaml.dll -->
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <NoWarn>$(NoWarn);NETSDK1206</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

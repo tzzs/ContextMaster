@@ -10,13 +10,9 @@ public sealed partial class HistoryPage : Page
     public HistoryPage()
     {
         InitializeComponent();
-        _viewModel = new HistoryViewModel();
-        LoadHistoryRecords();
-    }
-
-    private void LoadHistoryRecords()
-    {
-        _viewModel.LoadRecords();
-        HistoryListView.ItemsSource = _viewModel.OperationRecords;
+        var app = (App)Microsoft.UI.Xaml.Application.Current;
+        _viewModel = new HistoryViewModel(app.OperationHistoryService, app.MenuManagerService);
+        _ = _viewModel.LoadRecordsCommand.ExecuteAsync(null);
+        HistoryListView.ItemsSource = _viewModel.Records;
     }
 }

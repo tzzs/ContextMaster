@@ -36,6 +36,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<MenuItemEntry> _selectedItems = new ObservableCollection<MenuItemEntry>();
 
+    [ObservableProperty]
+    private string _statusMessage = string.Empty;
+
     public MainViewModel(IMenuManagerService menuManagerService)
     {
         _menuManagerService = menuManagerService;
@@ -56,6 +59,13 @@ public partial class MainViewModel : ObservableObject
             {
                 MenuItems.Add(item);
             }
+            StatusMessage = MenuItems.Any()
+                ? string.Empty
+                : "未获取到任何菜单项，可能当前场景下没有可管理的右键菜单。";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"加载菜单项失败: {ex.Message}";
         }
         finally
         {
@@ -74,11 +84,12 @@ public partial class MainViewModel : ObservableObject
         try
         {
             await Task.Run(() => _menuManagerService.ToggleItem(item));
-            await LoadMenuItemsAsync();
+            // 只更新被操作的条目状态，而不是重新加载整个列表
+            UpdateItemStatus(item);
         }
         catch (Exception ex)
         {
-            // 处理错误
+            StatusMessage = $"切换条目状态失败: {ex.Message}";
         }
     }
 
@@ -93,11 +104,11 @@ public partial class MainViewModel : ObservableObject
         try
         {
             await Task.Run(() => _menuManagerService.EnableItem(item));
-            await LoadMenuItemsAsync();
+            UpdateItemStatus(item);
         }
         catch (Exception ex)
         {
-            // 处理错误
+            StatusMessage = $"启用条目失败: {ex.Message}";
         }
     }
 
@@ -112,11 +123,11 @@ public partial class MainViewModel : ObservableObject
         try
         {
             await Task.Run(() => _menuManagerService.DisableItem(item));
-            await LoadMenuItemsAsync();
+            UpdateItemStatus(item);
         }
         catch (Exception ex)
         {
-            // 处理错误
+            StatusMessage = $"禁用条目失败: {ex.Message}";
         }
     }
 
@@ -131,12 +142,15 @@ public partial class MainViewModel : ObservableObject
         try
         {
             await Task.Run(() => _menuManagerService.BatchEnable(SelectedItems.ToList()));
+            foreach (var item in SelectedItems)
+            {
+                UpdateItemStatus(item);
+            }
             SelectedItems.Clear();
-            await LoadMenuItemsAsync();
         }
         catch (Exception ex)
         {
-            // 处理错误
+            StatusMessage = $"批量启用条目失败: {ex.Message}";
         }
     }
 
@@ -151,12 +165,30 @@ public partial class MainViewModel : ObservableObject
         try
         {
             await Task.Run(() => _menuManagerService.BatchDisable(SelectedItems.ToList()));
+            foreach (var item in SelectedItems)
+            {
+                UpdateItemStatus(item);
+            }
             SelectedItems.Clear();
-            await LoadMenuItemsAsync();
         }
         catch (Exception ex)
         {
-            // 处理错误
+            StatusMessage = $"批量禁用条目失败: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// 更新单个条目的状态，避免重新加载整个列表
+    /// </summary>
+    private void UpdateItemStatus(MenuItemEntry item)
+    {
+        var index = MenuItems.IndexOf(item);
+        if (index != -1)
+        {
+            // 切换IsEnabled属性
+            item.IsEnabled = !item.IsEnabled;
+            // 通知UI更新
+            OnPropertyChanged(nameof(MenuItems));
         }
     }
 
@@ -185,6 +217,31 @@ public partial class MainViewModel : ObservableObject
     {
         _debounceCts?.Cancel();
         _debounceCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+
+        // 防抖后执行搜索
+        _ = ExecuteSearchWithDebounceAsync(value);
+    }
+
+    private async Task ExecuteSearchWithDebounceAsync(string searchText)
+    {
+        try
+        {
+            await Task.Delay(300, _debounceCts?.Token ?? CancellationToken.None);
+
+            if (_debounceCts?.IsCancellationRequested == true)
+                return;
+
+            // 触发属性通知以更新UI
+            OnPropertyChanged(nameof(GetFilteredMenuItems));
+        }
+        catch (OperationCanceledException)
+        {
+            // 操作已取消（有新的搜索请求）
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"搜索失败: {ex.Message}";
+        }
     }
 
     /// <summary>

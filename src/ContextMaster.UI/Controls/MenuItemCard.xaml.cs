@@ -111,10 +111,8 @@ public sealed partial class MenuItemCard : UserControl
 
     private static void OnIsEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is MenuItemCard card)
-        {
-            card.OnToggled();
-        }
+        // 不再在这里触发Toggled事件，避免循环调用
+        // 只有用户交互才会触发Toggled事件
     }
 
     private static void OnIsSelectedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -137,16 +135,21 @@ public sealed partial class MenuItemCard : UserControl
 
     private void UpdateSelectedState()
     {
-        SelectCheckBox.IsChecked = IsSelected;
+        if (SelectCheckBox.IsChecked != IsSelected)
+        {
+            SelectCheckBox.IsChecked = IsSelected;
+        }
     }
 
     private void ToggleButton_Click(object sender, RoutedEventArgs e)
     {
-        IsEnabled = !IsEnabled;
+        // 直接触发Toggled事件，由外部处理状态变更
+        OnToggled();
     }
 
     private void ToggleSwitch_Toggled(object? sender, ToggledEventArgs e)
     {
+        // 直接触发Toggled事件，由外部处理状态变更
         OnToggled();
     }
 

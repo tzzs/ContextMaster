@@ -110,7 +110,7 @@
                 <!-- 切换开关 -->
                 <local:ContextToggleSwitch
                     Grid.Column="3"
-                    IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                    IsOn="{x:Bind IsEnabled, Mode=OneWay}"
                     Toggled="ToggleSwitch_Toggled"
                     VerticalAlignment="Center"
                     Margin="8,0,0,0" />

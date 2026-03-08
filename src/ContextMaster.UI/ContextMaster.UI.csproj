@@ -9,6 +9,7 @@
     <AssemblyName>ContextMaster.UI</AssemblyName>
     <UseWinUI>true</UseWinUI>
     <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <EnableMsixTooling>true</EnableMsixTooling>
     <!-- 未打包运行时必须自包含 Windows App SDK，否则会找不到 Microsoft.ui.xaml.dll -->
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>

@@ -16,6 +16,16 @@ public partial class DetailViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCopied = false;
 
+    /// <summary>
+    /// 复制文本到剪贴板的委托
+    /// </summary>
+    public Func<string, Task>? CopyToClipboardAction { get; set; }
+
+    /// <summary>
+    /// 在注册表编辑器中打开的委托
+    /// </summary>
+    public Func<string, Task>? OpenInRegistryAction { get; set; }
+
     public DetailViewModel()
     {
     }
@@ -49,13 +59,20 @@ public partial class DetailViewModel : ObservableObject
     [RelayCommand]
     private async Task CopyRegistryPathAsync()
     {
-        if (SelectedItem == null) return;
+        if (SelectedItem == null || CopyToClipboardAction == null) return;
 
-        // 在 WinUI 3 中应该使用 Windows.ApplicationModel.DataTransfer.Clipboard
-        // 这里先简单标记为已复制
-        IsCopied = true;
-        await Task.Delay(1500);
-        IsCopied = false;
+        try
+        {
+            await CopyToClipboardAction(FullRegistryPath);
+            IsCopied = true;
+            await Task.Delay(1500);
+            IsCopied = false;
+        }
+        catch (Exception ex)
+        {
+            // 处理异常
+            System.Diagnostics.Debug.WriteLine($"复制到剪贴板失败: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -64,16 +81,15 @@ public partial class DetailViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenInRegeditAsync()
     {
-        if (SelectedItem == null) return;
+        if (SelectedItem == null || OpenInRegistryAction == null) return;
 
         try
         {
-            // 在 WinUI 3 中可以使用 Launcher 启动 regedit
-            // 这里先保留空实现
+            await OpenInRegistryAction(FullRegistryPath);
         }
         catch (Exception ex)
         {
-            // 处理异常
+            System.Diagnostics.Debug.WriteLine($"打开注册表编辑器失败: {ex.Message}");
         }
     }
 

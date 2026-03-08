@@ -7,7 +7,8 @@
     xmlns:local="using:ContextMaster.UI"
     xmlns:controls="using:ContextMaster.UI.Controls"
     xmlns:helpers="using:ContextMaster.UI.Helpers"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    Title="ContextMaster - Windows 右键菜单管理工具">
 
     <Window.SystemBackdrop>
         <MicaBackdrop Kind="BaseAlt" />
@@ -15,62 +16,15 @@
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="40" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 自定义标题栏 -->
-        <Border
-            Grid.Row="0"
-            Background="Transparent"
-            x:Name="TitleBarBorder">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel
-                    Grid.Column="0"
-                    Orientation="Horizontal"
-                    Margin="8,0">
-
-                    <Border
-                        Width="20"
-                        Height="20"
-                        Background="{StaticResource AccentPrimaryBrush}"
-                        CornerRadius="4">
-                        <TextBlock
-                            Text="📋"
-                            FontSize="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center" />
-                    </Border>
-
-                    <TextBlock
-                        Text="ContextMaster"
-                        Style="{StaticResource BodyTextStyle}"
-                        VerticalAlignment="Center"
-                        Margin="8,0,0,0" />
-
-                </StackPanel>
-
-                <TextBlock
-                    Grid.Column="1"
-                    Text="Windows 右键菜单管理工具"
-                    Style="{StaticResource CaptionTextStyle}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center" />
-
-            </Grid>
-        </Border>
-
         <!-- 主内容区域 -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" />
+                <!-- 让左侧导航宽度跟随 NavigationView 的 Pane 宽度变化 -->
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -78,7 +32,7 @@
             <Border
                 Grid.Column="0"
                 BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,1,1,0"
+                BorderThickness="0,0,1,0"
                 Background="{StaticResource SurfaceBrush}">
 
                 <StackPanel Margin="8,0">
@@ -130,7 +84,7 @@
 
         <!-- 底部状态栏 -->
         <Border
-            Grid.Row="2"
+            Grid.Row="1"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"
             Background="{StaticResource SurfaceBrush}"

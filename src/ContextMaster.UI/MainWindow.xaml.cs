@@ -42,6 +42,12 @@ public sealed partial class MainWindow : Window
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
+        if (args.SelectedItem == sender.SettingsItem)
+        {
+            MainContentFrame.Navigate(typeof(SettingsPage));
+            return;
+        }
+
         if (args.SelectedItem is NavigationViewItem item)
         {
             string tag = (string)item.Tag;

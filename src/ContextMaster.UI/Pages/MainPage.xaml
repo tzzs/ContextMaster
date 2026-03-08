@@ -9,7 +9,8 @@
     xmlns:helpers="using:ContextMaster.UI.Helpers"
     xmlns:enums="using:ContextMaster.Core.Models.Enums"
     mc:Ignorable="d"
-    Background="{StaticResource BackgroundColorBrush}">
+    Background="{StaticResource BackgroundColorBrush}"
+    Loaded="Page_Loaded">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -25,66 +26,76 @@
             BorderThickness="0,0,0,1"
             Padding="{StaticResource Spacing16Thickness}">
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- 场景标题 -->
-                <StackPanel
-                    Grid.Column="0"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Center">
-                    <TextBlock
-                        x:Name="SceneTitle"
-                        Style="{StaticResource TitleTextStyle}"
-                        Text="文件"
-                        Margin="0,0,8,0" />
-                </StackPanel>
+                    <!-- 场景标题 -->
+                    <StackPanel
+                        Grid.Column="0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                        <TextBlock
+                            x:Name="SceneTitle"
+                            Style="{StaticResource TitleTextStyle}"
+                            Text="文件"
+                            Margin="0,0,8,0" />
+                    </StackPanel>
 
-                <!-- 搜索框 -->
-                <TextBox
-                    x:Name="SearchBox"
-                    Grid.Column="1"
-                    PlaceholderText="搜索菜单项..."
-                    Height="32"
-                    Width="300"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center"
-                    CornerRadius="{StaticResource RadiusSm}"
-                    TextChanged="SearchBox_TextChanged" />
-
-                <!-- 批量操作按钮 -->
-                <StackPanel
-                    Grid.Column="2"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Center"
-                    Margin="16,0,0,0">
-                    <Button
-                        x:Name="BatchEnableButton"
-                        Content="批量启用"
-                        Background="{StaticResource SuccessBackgroundBrush}"
-                        Foreground="{StaticResource SuccessBrush}"
-                        BorderThickness="0"
+                    <!-- 搜索框 -->
+                    <TextBox
+                        x:Name="SearchBox"
+                        Grid.Column="1"
+                        PlaceholderText="搜索菜单项..."
                         Height="32"
-                        Padding="12,0"
+                        Width="300"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
                         CornerRadius="{StaticResource RadiusSm}"
-                        Click="BatchEnableButton_Click"
-                        Margin="0,0,8,0" />
-                    <Button
-                        x:Name="BatchDisableButton"
-                        Content="批量禁用"
-                        Background="{StaticResource DangerBackgroundBrush}"
-                        Foreground="{StaticResource DangerBrush}"
-                        BorderThickness="0"
-                        Height="32"
-                        Padding="12,0"
-                        CornerRadius="{StaticResource RadiusSm}"
-                        Click="BatchDisableButton_Click" />
-                </StackPanel>
-            </Grid>
+                        TextChanged="SearchBox_TextChanged" />
+
+                    <!-- 批量操作按钮 -->
+                    <StackPanel
+                        Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Margin="16,0,0,0">
+                        <Button
+                            x:Name="BatchEnableButton"
+                            Content="批量启用"
+                            Background="{StaticResource SuccessBackgroundBrush}"
+                            Foreground="{StaticResource SuccessBrush}"
+                            BorderThickness="0"
+                            Height="32"
+                            Padding="12,0"
+                            CornerRadius="{StaticResource RadiusSm}"
+                            Click="BatchEnableButton_Click"
+                            Margin="0,0,8,0" />
+                        <Button
+                            x:Name="BatchDisableButton"
+                            Content="批量禁用"
+                            Background="{StaticResource DangerBackgroundBrush}"
+                            Foreground="{StaticResource DangerBrush}"
+                            BorderThickness="0"
+                            Height="32"
+                            Padding="12,0"
+                            CornerRadius="{StaticResource RadiusSm}"
+                            Click="BatchDisableButton_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- 数据/错误提示 -->
+                <TextBlock
+                    x:Name="StatusText"
+                    Style="{StaticResource CaptionTextStyle}"
+                    Foreground="{StaticResource DangerBrush}"
+                    Margin="0,8,0,0"
+                    Visibility="Collapsed" />
+            </StackPanel>
 
         </Border>
 

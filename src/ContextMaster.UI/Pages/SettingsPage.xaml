@@ -12,6 +12,81 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="{StaticResource Spacing16Thickness}">
         <StackPanel Spacing="{StaticResource Spacing16}">
 
+            <!-- 权限设置 -->
+            <Border
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource RadiusMd}"
+                Padding="{StaticResource Spacing12Thickness}">
+
+                <StackPanel>
+                    <TextBlock
+                        Style="{StaticResource TitleTextStyle}"
+                        Text="权限设置"
+                        Margin="0,0,0,12" />
+
+                    <!-- 权限状态 -->
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock
+                            Style="{StaticResource BodyTextStyle}"
+                            Text="当前权限状态"
+                            Margin="0,0,0,4" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 权限状态指示器 -->
+                            <Border
+                                x:Name="AdminStatusIndicator"
+                                Grid.Column="0"
+                                Width="12"
+                                Height="12"
+                                CornerRadius="100"
+                                Background="{StaticResource AccentPrimaryBrush}"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center" />
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock
+                                    x:Name="AdminStatusText"
+                                    Style="{StaticResource BodyTextStyle}"
+                                    Text="正在检查..." />
+                                <TextBlock
+                                    x:Name="AdminStatusDetail"
+                                    Style="{StaticResource CaptionTextStyle}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 以管理员身份重启 -->
+                    <StackPanel Margin="0,0,0,12">
+                        <TextBlock
+                            Style="{StaticResource BodyTextStyle}"
+                            Text="以管理员身份运行"
+                            Margin="0,0,0,4" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextStyle}"
+                            Text="需要管理员权限才能修改注册表"
+                            Margin="0,0,0,8" />
+                        <Button
+                            x:Name="RestartAsAdminButton"
+                            Content="以管理员身份重启"
+                            Background="{StaticResource AccentPrimaryBrush}"
+                            Foreground="{StaticResource WhiteBrush}"
+                            BorderThickness="0"
+                            Height="32"
+                            Padding="12,0"
+                            CornerRadius="{StaticResource RadiusSm}"
+                            HorizontalAlignment="Left"
+                            Click="RestartAsAdminButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+
+            </Border>
+
             <!-- 一般设置 -->
             <Border
                 Background="{StaticResource SurfaceBrush}"

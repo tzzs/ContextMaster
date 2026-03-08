@@ -38,6 +38,7 @@ TestResults/
 # 编辑器文件夹和文件
 .vs/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

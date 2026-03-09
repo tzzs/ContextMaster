@@ -23,6 +23,7 @@ export const IPC = {
   SYS_IS_ADMIN:         'sys:isAdmin',
   SYS_RESTART_AS_ADMIN: 'sys:restartAsAdmin',
   SYS_OPEN_REGEDIT:     'sys:openRegedit',
+  SYS_OPEN_LOG_DIR:     'sys:openLogDir',
   SYS_COPY_CLIPBOARD:   'sys:copyClipboard',
   WIN_MINIMIZE:         'win:minimize',
   WIN_MAXIMIZE:         'win:maximize',

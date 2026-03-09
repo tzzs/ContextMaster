@@ -67,7 +67,7 @@ function initServices(): void {
   registerRegistryHandlers(menuManager);
   registerHistoryHandlers(history, menuManager);
   registerBackupHandlers(backup);
-  registerSystemHandlers(ps);
+  registerSystemHandlers();
 }
 
 app.whenReady().then(() => {

@@ -52,8 +52,8 @@ $result = @($subKeys | ForEach-Object {
   $isEnabled = ($key.GetValue('LegacyDisable') -eq $null)
   $commandSubKey = Join-Path $key.PSPath 'command'
   $command = ''
-  if (Test-Path $commandSubKey) {
-    $command = (Get-Item $commandSubKey).GetValue('')
+  if (Test-Path -LiteralPath $commandSubKey) {
+    $command = (Get-Item -LiteralPath $commandSubKey).GetValue('')
     if (-not $command) { $command = '' }
   }
   $regKey = '${hkcrSubPath}\\' + $keyName
@@ -101,19 +101,5 @@ Set-ItemProperty -Path $keyPath -Name 'LegacyDisable' -Value '' -Type String -Fo
 Write-Output 'ok'
 `.trim();
     }
-  }
-
-  /**
-   * 构建打开 regedit 并跳转到指定键的脚本
-   */
-  buildOpenRegeditScript(fullRegPath: string): string {
-    // 将 HKEY_CLASSES_ROOT\... 写入 LastKey，再打开 regedit
-    const escaped = fullRegPath.replace(/'/g, "''");
-    return `
-$regPath = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Applets\\Regedit'
-if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-Set-ItemProperty -Path $regPath -Name 'LastKey' -Value '${escaped}' -Type String -Force
-Start-Process regedit.exe
-`.trim();
   }
 }

@@ -69,6 +69,9 @@ const api = {
   openRegedit: (fullRegPath: string) =>
     invoke<boolean>(IPC.SYS_OPEN_REGEDIT, fullRegPath),
 
+  openLogDir: () =>
+    invoke<boolean>(IPC.SYS_OPEN_LOG_DIR),
+
   copyToClipboard: (text: string) =>
     invoke<boolean>(IPC.SYS_COPY_CLIPBOARD, text),
 

@@ -25,6 +25,11 @@ export function toggleSwitch(btn: HTMLElement): void {
   btn.classList.toggle('off');
 }
 
-const settingsPageApi = { requestAdminRestart, toggleSwitch };
+export async function openLogDir(): Promise<void> {
+  const result = await window.api.openLogDir();
+  if (!result.success) alert(`打开日志目录失败: ${result.error}`);
+}
+
+const settingsPageApi = { requestAdminRestart, toggleSwitch, openLogDir };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (window as any)._settingsPage = settingsPageApi;

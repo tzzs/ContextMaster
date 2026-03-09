@@ -165,6 +165,8 @@ export function showDetail(id: number): void {
   const regRoot = SCENE_REG_ROOTS[item.menuScene];
   const regItemPath = `${regRoot}\\${item.registryKey.split('\\').pop()}`;
   const regCmdPath = `${regItemPath}\\command`;
+  // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
+  const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const legacyNote = item.isEnabled ? '' : `
     <div style="display:flex;align-items:flex-start;gap:6px;background:var(--danger-bg);border:1px solid rgba(196,43,28,0.18);border-radius:var(--radius-sm);padding:7px 9px;margin-top:4px;">
@@ -215,7 +217,7 @@ export function showDetail(id: number): void {
       <div class="detail-field-label">注册表路径</div>
       <div style="position:relative;">
         <div class="detail-field-value mono" style="padding-right:28px;word-break:break-all;line-height:1.6;">${escapeHtml(regItemPath)}</div>
-        <button onclick="window.api.copyToClipboard('${regItemPath.replace(/'/g, "\\'")}').then(() => window._mainPage.flashCopyBtn(this))"
+        <button onclick="window.api.copyToClipboard('${regItemPathAttr}').then(() => window._mainPage.flashCopyBtn(this))"
           title="复制路径"
           style="position:absolute;top:4px;right:4px;width:20px;height:20px;border:none;background:transparent;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--text3);">
           <svg viewBox="0 0 16 16" style="width:11px;height:11px;fill:currentColor;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
@@ -231,7 +233,7 @@ export function showDetail(id: number): void {
 
     <div class="detail-field">
       <div class="detail-field-label">在注册表编辑器中打开</div>
-      <button onclick="window.api.openRegedit('${regItemPath.replace(/'/g, "\\'")}').catch(()=>{})"
+      <button onclick="window.api.openRegedit('${regItemPathAttr}').then(r=>{if(!r.success)alert('定位失败: '+r.error);}).catch(e=>alert('调用失败: '+e))"
         style="display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:11px;cursor:pointer;color:var(--text2);font-family:inherit;margin-top:2px;">
         <svg viewBox="0 0 16 16" style="width:11px;height:11px;fill:currentColor;"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
         在 Regedit 中定位
@@ -328,6 +330,9 @@ export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
     if (result.success) {
       const badgeEl = document.getElementById(`badge-${scene}`);
       if (badgeEl) badgeEl.textContent = String(result.data.length);
+    } else {
+      const badgeEl = document.getElementById(`badge-${scene}`);
+      if (badgeEl) badgeEl.textContent = '?';
     }
   }
 }

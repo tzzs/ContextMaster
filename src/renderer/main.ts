@@ -1,9 +1,51 @@
 import './api/bridge';
 import { MenuScene } from '../shared/enums';
-import { loadScene, SCENE_NAMES, preloadBadgeCounts } from './pages/mainPage';
+import type { MenuItemEntry } from '../shared/types';
+import { loadScene, SCENE_NAMES, preloadBadgeCounts, renderGlobalResults, restoreSceneTitle } from './pages/mainPage';
 import { loadHistory, renderHistory, filterHistory, clearAllHistory } from './pages/historyPage';
 import { loadBackups, renderBackup, createBackup, importBackup } from './pages/backupPage';
 import { initSettings, requestAdminRestart, toggleSwitch, openLogDir } from './pages/settingsPage';
+
+// ── 全局搜索 ──
+let allScenesCache: Map<MenuScene, MenuItemEntry[]> | null = null;
+let globalSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function ensureAllScenesCache(): Promise<Map<MenuScene, MenuItemEntry[]>> {
+  if (allScenesCache) return allScenesCache;
+  const cache = new Map<MenuScene, MenuItemEntry[]>();
+  const scenes = Object.values(MenuScene) as MenuScene[];
+  await Promise.all(
+    scenes.map(async (scene) => {
+      const result = await window.api.getMenuItems(scene);
+      if (result.success) cache.set(scene, result.data);
+    })
+  );
+  allScenesCache = cache;
+  return cache;
+}
+
+async function doGlobalSearch(query: string): Promise<void> {
+  if (!query.trim()) {
+    restoreSceneTitle(currentScene);
+    return;
+  }
+  const cache = await ensureAllScenesCache();
+  const q = query.toLowerCase();
+  const matched: MenuItemEntry[] = [];
+  for (const items of cache.values()) {
+    for (const item of items) {
+      if (
+        item.name.toLowerCase().includes(q) ||
+        item.command.toLowerCase().includes(q) ||
+        item.source.toLowerCase().includes(q) ||
+        item.registryKey.toLowerCase().includes(q)
+      ) {
+        matched.push(item);
+      }
+    }
+  }
+  renderGlobalResults(matched, query);
+}
 
 // ── Undo Bar ──
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
@@ -37,6 +79,11 @@ let currentPage: PageId = 'main';
 let currentScene: MenuScene = MenuScene.Desktop;
 
 async function switchPage(page: PageId, navEl?: HTMLElement, scene?: MenuScene): Promise<void> {
+  // 切换场景时清空搜索状态
+  allScenesCache = null;
+  const searchEl = document.getElementById('globalSearch') as HTMLInputElement | null;
+  if (searchEl) searchEl.value = '';
+
   document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
   document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
 
@@ -123,9 +170,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 管理员检查
   await checkAdminStatus();
 
-  // 搜索框绑定
-  document.getElementById('itemSearch')?.addEventListener('input', () => {
-    import('./pages/mainPage').then(({ renderItems }) => renderItems());
+  // 全局搜索绑定（300ms 防抖）
+  document.getElementById('globalSearch')?.addEventListener('input', (e) => {
+    const query = (e.target as HTMLInputElement).value;
+    if (globalSearchTimer) clearTimeout(globalSearchTimer);
+    globalSearchTimer = setTimeout(() => doGlobalSearch(query), 300);
   });
 
   // 默认加载桌面右键场景

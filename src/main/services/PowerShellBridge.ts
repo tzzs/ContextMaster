@@ -81,11 +81,12 @@ $result | ConvertTo-Json -Compress -Depth 3
     if (enable) {
       return `
 $ErrorActionPreference = 'Stop'
+New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
 $keyPath = '${psPath}'
-if (Test-Path $keyPath) {
-  $prop = Get-ItemProperty -Path $keyPath -Name 'LegacyDisable' -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $keyPath) {
+  $prop = Get-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -ErrorAction SilentlyContinue
   if ($prop -ne $null) {
-    Remove-ItemProperty -Path $keyPath -Name 'LegacyDisable' -Force
+    Remove-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Force
   }
 }
 Write-Output 'ok'
@@ -93,11 +94,12 @@ Write-Output 'ok'
     } else {
       return `
 $ErrorActionPreference = 'Stop'
+New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
 $keyPath = '${psPath}'
-if (-not (Test-Path $keyPath)) {
+if (-not (Test-Path -LiteralPath $keyPath)) {
   throw "注册表项不存在: ${hkcrRelativeKey}"
 }
-Set-ItemProperty -Path $keyPath -Name 'LegacyDisable' -Value '' -Type String -Force
+Set-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Value '' -Type String -Force
 Write-Output 'ok'
 `.trim();
     }

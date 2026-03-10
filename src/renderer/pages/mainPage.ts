@@ -81,7 +81,7 @@ export function renderItems(): void {
   listEl.innerHTML = items.map((item) => renderItemCard(item)).join('');
 }
 
-function renderItemCard(item: MenuItemEntry): string {
+function renderItemCard(item: MenuItemEntry, showScene = false): string {
   const isSelected = item.id === selectedItemId;
   const typeTag =
     item.type === MenuItemType.Custom
@@ -90,6 +90,9 @@ function renderItemCard(item: MenuItemEntry): string {
   const stateTag = item.isEnabled
     ? '<span class="tag tag-enabled">已启用</span>'
     : '<span class="tag tag-disabled">已禁用</span>';
+  const sourceText = showScene
+    ? `${SCENE_NAMES[item.menuScene]}${item.source ? ' · ' + item.source : ''}`
+    : (item.source || '未知来源');
 
   return `
   <div class="item-card${item.isEnabled ? '' : ' disabled-row'}${isSelected ? ' selected' : ''}"
@@ -101,7 +104,7 @@ function renderItemCard(item: MenuItemEntry): string {
     <div class="item-info">
       <div class="item-name">${escapeHtml(item.name)}</div>
       <div class="item-cmd">${escapeHtml(item.command || '—')}</div>
-      <div class="item-source">${escapeHtml(item.source || '未知来源')}</div>
+      <div class="item-source">${escapeHtml(sourceText)}</div>
     </div>
     <div class="item-meta">
       ${typeTag}
@@ -319,6 +322,42 @@ export function deleteSelected(): void {
   const item = currentItems.find((i) => i.id === selectedItemId);
   if (!item) return;
   alert(`删除功能开发中\n\n条目：${item.name}`);
+}
+
+// ── 全局搜索结果渲染 ──
+export function renderGlobalResults(items: MenuItemEntry[], query: string): void {
+  // 切换到 main 页（确保可见）
+  document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+  document.getElementById('page-main')?.classList.add('active');
+
+  const titleEl = document.getElementById('sceneTitle');
+  if (titleEl) titleEl.innerHTML = `搜索结果 <span>${items.length} 个匹配「${escapeHtml(query)}」</span>`;
+
+  selectedItemId = null;
+  resetDetailPanel();
+
+  const listEl = document.getElementById('itemList');
+  if (!listEl) return;
+
+  if (!items.length) {
+    listEl.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
+      <div>未找到匹配「${escapeHtml(query)}」的条目</div>
+    </div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map((item) => renderItemCard(item, true)).join('');
+}
+
+// ── 恢复场景视图（全局搜索退出时调用）──
+export function restoreSceneTitle(scene: MenuScene): void {
+  const titleEl = document.getElementById('sceneTitle');
+  if (titleEl) {
+    titleEl.innerHTML = `${SCENE_NAMES[scene]} <span>${currentItems.length} 个条目</span>`;
+  }
+  renderItems();
+  resetDetailPanel();
 }
 
 // ── 预加载其余场景的 badge 数量 ──

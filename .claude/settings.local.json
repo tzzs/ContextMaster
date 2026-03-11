@@ -4,7 +4,26 @@
       "Bash(dotnet build)",
       "Bash(rm -f src/ContextMaster.Core/Services/*.cs)",
       "Bash(rm -f src/ContextMaster.Core/ViewModels/*.cs)",
-      "Bash(rm -f src/ContextMaster.Data/*.cs)"
+      "Bash(rm -f src/ContextMaster.Data/*.cs)",
+      "Bash(dir *)",
+      "Bash(dotnet *)",
+      "Bash(./ContextMaster.UI.exe)",
+      "Bash(cmd /c \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe ContextMaster.sln /p:Configuration=Debug /p:Platform=x64\")",
+      "Bash(cmd /c \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe src\\\\ContextMaster.UI\\\\ContextMaster.UI.csproj /p:Configuration=Debug /p:Platform=x64\")",
+      "Bash(cmd /c \"start ContextMaster.UI.exe\")",
+      "Bash(tasklist)",
+      "Bash(findstr \"ContextMaster\")",
+      "Bash(cmd /c \"ContextMaster.UI.exe\")",
+      "Bash(powershell -Command \"Get-Process | Where-Object { $_ProcessName -like ''*ContextMaster*'' }\")",
+      "Bash(start \"\" \"ContextMaster.UI.exe\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx electron-forge:*)",
+      "Bash(xargs grep:*)",
+      "Bash(sed:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)"
     ]
   }
 }

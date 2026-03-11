@@ -146,7 +146,7 @@ export async function toggleItem(id: number): Promise<void> {
 
   const result = await window.api.toggleItem(params);
   if (!result.success) {
-    showError(`操作失败: ${result.error}`);
+    showOperationError(`操作失败: ${result.error}`);
     return;
   }
 
@@ -300,6 +300,33 @@ function resetDetailPanel(): void {
 function showError(msg: string): void {
   const listEl = document.getElementById('itemList');
   if (listEl) listEl.innerHTML = `<div class="empty-state" style="color:var(--danger);">${escapeHtml(msg)}</div>`;
+}
+
+function showOperationError(msg: string): void {
+  let toast = document.getElementById('opErrorToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'opErrorToast';
+    toast.style.cssText = [
+      'position:absolute', 'top:12px', 'left:50%', 'transform:translateX(-50%)',
+      'background:var(--danger)', 'color:#fff', 'padding:8px 16px',
+      'border-radius:var(--radius-sm)', 'font-size:13px', 'z-index:999',
+      'box-shadow:0 2px 8px rgba(0,0,0,0.25)', 'pointer-events:none',
+      'white-space:nowrap', 'max-width:80%', 'text-overflow:ellipsis', 'overflow:hidden',
+    ].join(';');
+    const contentArea = document.getElementById('itemList')?.parentElement ?? document.body;
+    contentArea.style.position = 'relative';
+    contentArea.appendChild(toast);
+  }
+
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  toast.style.opacity = '1';
+
+  clearTimeout((toast as HTMLElement & { _hideTimer?: ReturnType<typeof setTimeout> })._hideTimer);
+  (toast as HTMLElement & { _hideTimer?: ReturnType<typeof setTimeout> })._hideTimer = setTimeout(() => {
+    if (toast) toast.style.display = 'none';
+  }, 3000);
 }
 
 function escapeHtml(s: string): string {

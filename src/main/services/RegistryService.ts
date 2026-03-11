@@ -72,7 +72,7 @@ export class RegistryService {
   async setItemEnabled(registryKey: string, enabled: boolean): Promise<void> {
     try {
       const script = this.ps.buildSetEnabledScript(registryKey, enabled);
-      await this.ps.execute<string>(script);
+      await this.ps.executeElevated<string>(script);
     } catch (e) {
       if (this.inTransaction) {
         await this.rollback();

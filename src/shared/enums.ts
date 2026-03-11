@@ -10,6 +10,7 @@ export enum MenuScene {
 export enum MenuItemType {
   System = 'System',
   Custom = 'Custom',
+  ShellExt = 'ShellExt',
 }
 
 export enum OperationType {

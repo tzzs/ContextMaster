@@ -14,7 +14,7 @@ import type { MenuScene } from '../../shared/enums';
 
 export interface WindowApi {
   getMenuItems(scene: MenuScene): Promise<IpcResult<MenuItemEntry[]>>;
-  toggleItem(params: ToggleItemParams): Promise<IpcResult<{ newState: boolean }>>;
+  toggleItem(params: ToggleItemParams): Promise<IpcResult<{ newState: boolean; newRegistryKey?: string }>>;
   batchToggle(params: BatchToggleParams): Promise<IpcResult<boolean>>;
 
   getHistory(): Promise<IpcResult<OperationRecord[]>>;

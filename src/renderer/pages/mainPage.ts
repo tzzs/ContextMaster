@@ -86,7 +86,9 @@ function renderItemCard(item: MenuItemEntry, showScene = false): string {
   const typeTag =
     item.type === MenuItemType.Custom
       ? '<span class="tag tag-custom">自定义</span>'
-      : '<span class="tag tag-system">系统</span>';
+      : item.type === MenuItemType.ShellExt
+        ? '<span class="tag tag-shellext">Shell 扩展</span>'
+        : '<span class="tag tag-system">系统</span>';
   const stateTag = item.isEnabled
     ? '<span class="tag tag-enabled">已启用</span>'
     : '<span class="tag tag-disabled">已禁用</span>';
@@ -142,6 +144,7 @@ export async function toggleItem(id: number): Promise<void> {
     isEnabled: item.isEnabled,
     name: item.name,
     menuScene: item.menuScene,
+    type: item.type,
   };
 
   const result = await window.api.toggleItem(params);
@@ -151,6 +154,9 @@ export async function toggleItem(id: number): Promise<void> {
   }
 
   item.isEnabled = result.data.newState;
+  if (result.data.newRegistryKey) {
+    item.registryKey = result.data.newRegistryKey;
+  }
   renderItems();
   const action = item.isEnabled ? '启用' : '禁用';
   (window as Window & { showUndo?: (msg: string, itemId: number) => void })
@@ -165,16 +171,24 @@ export function showDetail(id: number): void {
   const item = currentItems.find((i) => i.id === id);
   if (!item) return;
 
-  const regRoot = SCENE_REG_ROOTS[item.menuScene];
-  const regItemPath = `${regRoot}\\${item.registryKey.split('\\').pop()}`;
-  const regCmdPath = `${regItemPath}\\command`;
+  const isShellExt = item.type === MenuItemType.ShellExt;
+  // ShellExt: registryKey 已含完整相对路径；Classic Shell: 从 SCENE_REG_ROOTS 拼接
+  const regItemPath = isShellExt
+    ? `HKEY_CLASSES_ROOT\\${item.registryKey}`
+    : `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
+  const regCmdPath = isShellExt
+    ? `(COM DLL，CLSID: ${item.command})`
+    : `${regItemPath}\\command`;
   // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
   const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
+  const disabledNoteContent = isShellExt
+    ? `已将注册表键名添加 <code style="background:rgba(196,43,28,0.08);padding:0 3px;border-radius:2px;font-family:Consolas;">-</code> 前缀使其禁用（Shell 扩展机制）`
+    : `已在注册表项下写入 <code style="background:rgba(196,43,28,0.08);padding:0 3px;border-radius:2px;font-family:Consolas;">LegacyDisable</code> 键值使其禁用`;
   const legacyNote = item.isEnabled ? '' : `
     <div style="display:flex;align-items:flex-start;gap:6px;background:var(--danger-bg);border:1px solid rgba(196,43,28,0.18);border-radius:var(--radius-sm);padding:7px 9px;margin-top:4px;">
       <svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:var(--danger);flex-shrink:0;margin-top:1px;"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
-      <span style="font-size:11px;color:var(--danger);line-height:1.5;">已在注册表项下写入 <code style="background:rgba(196,43,28,0.08);padding:0 3px;border-radius:2px;font-family:Consolas;">LegacyDisable</code> 键值使其禁用</span>
+      <span style="font-size:11px;color:var(--danger);line-height:1.5;">${disabledNoteContent}</span>
     </div>`;
 
   const nameEl = document.getElementById('detailName');
@@ -198,7 +212,7 @@ export function showDetail(id: number): void {
     <div class="detail-field">
       <div class="detail-field-label">类型</div>
       <div class="detail-field-value">
-        <span class="tag ${item.type === MenuItemType.Custom ? 'tag-custom' : 'tag-system'}">${item.type === MenuItemType.Custom ? '自定义' : '系统'}</span>
+        <span class="tag ${item.type === MenuItemType.Custom ? 'tag-custom' : item.type === MenuItemType.ShellExt ? 'tag-shellext' : 'tag-system'}">${item.type === MenuItemType.Custom ? '自定义' : item.type === MenuItemType.ShellExt ? 'Shell 扩展' : '系统'}</span>
       </div>
     </div>
     <div class="detail-field">
@@ -230,7 +244,7 @@ export function showDetail(id: number): void {
     </div>
 
     <div class="detail-field">
-      <div class="detail-field-label">命令子键路径</div>
+      <div class="detail-field-label">${isShellExt ? 'COM 对象' : '命令子键路径'}</div>
       <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
     </div>
 

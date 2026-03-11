@@ -25,10 +25,10 @@ export function registerRegistryHandlers(menuManager: MenuManagerService): void 
         source: '',
         menuScene: params.menuScene,
         registryKey: params.registryKey,
-        type: MenuItemType.System,
+        type: params.type ?? MenuItemType.System,
       };
-      await menuManager.toggleItem(item);
-      return { newState: !params.isEnabled };
+      const result = await menuManager.toggleItem(item);
+      return { newState: !params.isEnabled, newRegistryKey: result.newRegistryKey };
     })
   );
 

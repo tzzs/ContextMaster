@@ -170,7 +170,7 @@ if (Test-Path -LiteralPath $keyPath) {
     Remove-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Force
   }
 }
-Write-Output '"ok"'
+Write-Output '{"ok":true}'
 `.trim();
     } else {
       return `
@@ -181,8 +181,188 @@ if (-not (Test-Path -LiteralPath $keyPath)) {
   throw "注册表项不存在: ${hkcrRelativeKey}"
 }
 Set-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Value '' -Type String -Force
-Write-Output '"ok"'
+Write-Output '{"ok":true}'
 `.trim();
     }
+  }
+
+  /**
+   * 构建枚举 shellex\ContextMenuHandlers 下所有 Shell 扩展的脚本
+   * 使用四级级联策略解析本地化名称：
+   *  1. LocalizedString/FriendlyTypeName → SHLoadIndirectString（解析 @DLL,-ID 格式）
+   *  2. InprocServer32 DLL 字符串表 → 通用字符串质量筛选（LoadLibraryEx + LoadString）
+   *  3. CLSID 默认值
+   *  4. 处理程序键名（最终兜底）
+   * CmHelper.dll 编译后缓存至 %LOCALAPPDATA%\ContextMaster\，避免重复编译开销
+   */
+  buildGetShellExtItemsScript(shellexSubPath: string): string {
+    return `
+$ErrorActionPreference = 'SilentlyContinue'
+New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
+$cmDir = Join-Path $env:LOCALAPPDATA 'ContextMaster'
+$cmDll = Join-Path $cmDir 'CmHelper.dll'
+$helperLoaded = $false
+if (Test-Path $cmDll) {
+  try { Add-Type -Path $cmDll -ErrorAction Stop; $helperLoaded = $true } catch {}
+}
+if (-not $helperLoaded) {
+  $src = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Collections.Generic;
+public class CmHelper {
+    const uint LOAD_AS_DATA = 2u;
+    [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+    static extern int SHLoadIndirectString(string s, StringBuilder buf, int cap, IntPtr r);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    static extern IntPtr LoadLibraryEx(string p, IntPtr h, uint f);
+    [DllImport("kernel32.dll")]
+    static extern bool FreeLibrary(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int LoadString(IntPtr h, uint id, StringBuilder buf, int cap);
+    public static string ResolveIndirect(string s) {
+        if (string.IsNullOrEmpty(s) || !s.StartsWith("@")) return null;
+        var sb = new StringBuilder(512);
+        return SHLoadIndirectString(s, sb, 512, IntPtr.Zero) == 0 ? sb.ToString() : null;
+    }
+    public static string[] ReadDllStrings(string dll, uint from, uint to) {
+        var list = new List<string>();
+        var hMod = LoadLibraryEx(dll, IntPtr.Zero, LOAD_AS_DATA);
+        if (hMod == IntPtr.Zero) return list.ToArray();
+        try {
+            for (uint i = from; i <= to; i++) {
+                var sb = new StringBuilder(512);
+                if (LoadString(hMod, i, sb, 512) > 0) list.Add(sb.ToString());
+            }
+        } finally { FreeLibrary(hMod); }
+        return list.ToArray();
+    }
+}
+'@
+  if (-not (Test-Path $cmDir)) { New-Item -Path $cmDir -ItemType Directory -Force | Out-Null }
+  if (Test-Path $cmDll) { Remove-Item -Path $cmDll -Force -ErrorAction SilentlyContinue }
+  try {
+    Add-Type -TypeDefinition $src -OutputAssembly $cmDll -ErrorAction Stop
+    $helperLoaded = $true
+  } catch {
+    try { Add-Type -TypeDefinition $src -ErrorAction Stop; $helperLoaded = $true } catch {}
+  }
+}
+function Resolve-ExtName($clsid, $fallback) {
+  if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
+    $clsidPath = 'HKCR:\\CLSID\\' + $clsid
+    if (Test-Path -LiteralPath $clsidPath) {
+      $clsidKey = Get-Item -LiteralPath $clsidPath
+      foreach ($valName in @('LocalizedString', 'FriendlyTypeName')) {
+        $raw = $clsidKey.GetValue($valName)
+        if ($raw -and $raw.StartsWith('@')) {
+          try {
+            $resolved = [CmHelper]::ResolveIndirect($raw)
+            if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+          } catch {}
+        }
+      }
+      $inprocPath = Join-Path $clsidPath 'InprocServer32'
+      if (Test-Path -LiteralPath $inprocPath) {
+        $dllPath = (Get-Item -LiteralPath $inprocPath).GetValue('')
+        # Fix 1: 展开 %SystemRoot% 等环境变量，否则 Test-Path 永远返回 $false
+        if ($dllPath) {
+          $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllPath)
+        }
+        if ($dllPath -and (Test-Path -LiteralPath $dllPath)) {
+          # Level 2: 通用字符串质量筛选（过滤后取第一条，无硬编码词表，无长度限制）
+          try {
+            $candidates = [CmHelper]::ReadDllStrings($dllPath, 1, 1000) |
+              Where-Object {
+                $_.Length -ge 2 -and
+                $_ -notmatch '[\\\\/:*?<>|]' -and
+                $_ -notmatch '^\\{' -and
+                $_ -notmatch '^https?://' -and
+                $_ -notmatch '%[0-9A-Za-z]' -and
+                $_ -notmatch '\\{[0-9]+\\}' -and
+                $_ -notmatch '[\\r\\n\\t]' -and
+                $_ -notmatch '^[0-9]' -and
+                $_ -notmatch '[\\u3002\\uff01\\uff1f]' -and
+                $_ -notmatch '[.!?]$'
+              }
+            $pool = $candidates | Where-Object { $_ -match '[^\\x00-\\x7F]' }
+            if (-not $pool) { $pool = $candidates }
+            $best = $pool | Select-Object -First 1
+            if ($best) { return $best }
+          } catch {}
+          # Level 2.5: DLL VersionInfo（适用于英文/日文等非中文软件）
+          try {
+            $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
+            $desc = $null
+            if ($ver.FileDescription -and $ver.FileDescription.Length -ge 2) {
+              $desc = $ver.FileDescription
+            } elseif ($ver.ProductName -and $ver.ProductName.Length -ge 2) {
+              $desc = $ver.ProductName
+            }
+            if ($desc -and $desc.Length -le 80 -and $desc -notmatch '^\\{' -and $desc -notmatch '[\\\\/:*?<>|]') {
+              return $desc
+            }
+          } catch {}
+        }
+      }
+      $def = $clsidKey.GetValue('')
+      if ($def) { return [string]$def }
+    }
+  }
+  return $fallback
+}
+$shellexPath = 'HKCR:\\${shellexSubPath}'
+if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }
+$handlers = Get-ChildItem -LiteralPath $shellexPath | Where-Object { $_.PSIsContainer }
+$result = @($handlers | ForEach-Object {
+  $handlerKeyName = $_.PSChildName
+  $clsid = $_.GetValue('')
+  if (-not $clsid) { $clsid = $handlerKeyName }
+  $cleanName   = $handlerKeyName -replace '^-+', ''
+  $displayName = Resolve-ExtName $clsid $cleanName
+  $isEnabled   = -not $handlerKeyName.StartsWith('-')
+  $regKey = '${shellexSubPath}\\' + $handlerKeyName
+  [PSCustomObject]@{
+    name        = [string]$displayName
+    command     = [string]$clsid
+    iconPath    = $null
+    isEnabled   = [bool]$isEnabled
+    source      = [string]$handlerKeyName
+    registryKey = [string]$regKey
+    subKeyName  = [string]$handlerKeyName
+    itemType    = 'ShellExt'
+  }
+})
+$result | ConvertTo-Json -Compress -Depth 3
+`.trim();
+  }
+
+  /**
+   * 构建启用/禁用 Shell 扩展的脚本（通过重命名键名添加/去除 '-' 前缀）
+   * enable=true  → 将 '-Name' 重命名为 'Name'
+   * enable=false → 将 'Name' 重命名为 '-Name'
+   */
+  buildShellExtToggleScript(hkcrRelativeKey: string, enable: boolean): string {
+    const lastSlash = hkcrRelativeKey.lastIndexOf('\\');
+    const parentRelPath = hkcrRelativeKey.substring(0, lastSlash);
+    const keyName = hkcrRelativeKey.substring(lastSlash + 1);
+    const cleanName = keyName.replace(/^-+/, '');
+    const psParentPath = `HKCR:\\${parentRelPath}`;
+    // enable: 找 -cleanName 改为 cleanName；disable: 找 cleanName 改为 -cleanName
+    const psCurrentKeyName = enable ? `-${cleanName}` : cleanName;
+    const psNewKeyName = enable ? cleanName : `-${cleanName}`;
+    return `
+$ErrorActionPreference = 'Stop'
+New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
+$parentPath = '${psParentPath}'
+$currentKey = '${psCurrentKeyName}'
+$newKey = '${psNewKeyName}'
+$fullPath = Join-Path $parentPath $currentKey
+if (Test-Path -LiteralPath $fullPath) {
+  Rename-Item -LiteralPath $fullPath -NewName $newKey -Force
+}
+Write-Output '{"ok":true}'
+`.trim();
   }
 }

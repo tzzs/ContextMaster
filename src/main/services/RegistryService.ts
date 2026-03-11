@@ -96,11 +96,11 @@ export class RegistryService {
     try {
       if (this.isShellExtKey(registryKey)) {
         const script = this.ps.buildShellExtToggleScript(registryKey, enabled);
-        await this.ps.execute<{ ok: boolean }>(script);
+        await this.ps.executeElevated<{ ok: boolean }>(script);
         return { newRegistryKey: this.computeShellExtNewKey(registryKey, enabled) };
       } else {
         const script = this.ps.buildSetEnabledScript(registryKey, enabled);
-        await this.ps.execute<{ ok: boolean }>(script);
+        await this.ps.executeElevated<{ ok: boolean }>(script);
         return {};
       }
     } catch (e) {
@@ -158,10 +158,10 @@ export class RegistryService {
   private async setItemEnabledInternal(registryKey: string, enabled: boolean): Promise<void> {
     if (this.isShellExtKey(registryKey)) {
       const script = this.ps.buildShellExtToggleScript(registryKey, enabled);
-      await this.ps.execute<{ ok: boolean }>(script);
+      await this.ps.executeElevated<{ ok: boolean }>(script);
     } else {
       const script = this.ps.buildSetEnabledScript(registryKey, enabled);
-      await this.ps.execute<{ ok: boolean }>(script);
+      await this.ps.executeElevated<{ ok: boolean }>(script);
     }
   }
 

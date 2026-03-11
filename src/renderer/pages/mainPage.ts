@@ -172,18 +172,10 @@ export function showDetail(id: number): void {
   if (!item) return;
 
   const isShellExt = item.type === MenuItemType.ShellExt;
-  // ShellExt: registryKey 已含完整相对路径；禁用时键名以 '-' 开头，需还原实际路径
-  // Classic Shell: 从 SCENE_REG_ROOTS 拼接
-  const regItemPath = (() => {
-    if (isShellExt) {
-      const sep    = item.registryKey.lastIndexOf('\\');
-      const parent = item.registryKey.substring(0, sep + 1); // 含末尾 '\'
-      const name   = item.registryKey.substring(sep + 1);
-      const actual = item.isEnabled ? name : `-${name}`;
-      return `HKEY_CLASSES_ROOT\\${parent}${actual}`;
-    }
-    return `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
-  })();
+  // ShellExt: registryKey 已含完整相对路径；Classic Shell: 从 SCENE_REG_ROOTS 拼接
+  const regItemPath = isShellExt
+    ? `HKEY_CLASSES_ROOT\\${item.registryKey}`
+    : `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
   const regCmdPath = isShellExt
     ? `(COM DLL，CLSID: ${item.command})`
     : `${regItemPath}\\command`;

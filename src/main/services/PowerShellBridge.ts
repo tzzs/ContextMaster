@@ -256,15 +256,11 @@ function Resolve-ExtName($clsid, $fallback) {
       $clsidKey = Get-Item -LiteralPath $clsidPath
       foreach ($valName in @('LocalizedString', 'FriendlyTypeName')) {
         $raw = $clsidKey.GetValue($valName)
-        if ($raw) {
-          if ($raw.StartsWith('@')) {
-            try {
-              $resolved = [CmHelper]::ResolveIndirect($raw)
-              if ($resolved -and $resolved.Length -ge 2) { return $resolved }
-            } catch {}
-          } elseif ($raw.Length -ge 2) {
-            return $raw
-          }
+        if ($raw -and $raw.StartsWith('@')) {
+          try {
+            $resolved = [CmHelper]::ResolveIndirect($raw)
+            if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+          } catch {}
         }
       }
       $inprocPath = Join-Path $clsidPath 'InprocServer32'
@@ -326,7 +322,7 @@ $result = @($handlers | ForEach-Object {
   $cleanName   = $handlerKeyName -replace '^-+', ''
   $displayName = Resolve-ExtName $clsid $cleanName
   $isEnabled   = -not $handlerKeyName.StartsWith('-')
-  $regKey = '${shellexSubPath}\\' + $cleanName
+  $regKey = '${shellexSubPath}\\' + $handlerKeyName
   [PSCustomObject]@{
     name        = [string]$displayName
     command     = [string]$clsid
@@ -363,10 +359,9 @@ $parentPath = '${psParentPath}'
 $currentKey = '${psCurrentKeyName}'
 $newKey = '${psNewKeyName}'
 $fullPath = Join-Path $parentPath $currentKey
-if (-not (Test-Path -LiteralPath $fullPath)) {
-  throw "ShellExt key not found: $fullPath"
+if (Test-Path -LiteralPath $fullPath) {
+  Rename-Item -LiteralPath $fullPath -NewName $newKey -Force
 }
-Rename-Item -LiteralPath $fullPath -NewName $newKey -Force
 Write-Output '{"ok":true}'
 `.trim();
   }

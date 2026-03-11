@@ -120,29 +120,11 @@ async function checkAdminStatus(): Promise<void> {
   // 状态栏
   const sbDot = document.getElementById('sbDot') as HTMLElement | null;
   const sbAdmin = document.getElementById('sbAdmin');
-  if (sbDot) sbDot.style.background = isAdmin ? '#70D070' : 'var(--danger)';
-  if (sbAdmin) sbAdmin.textContent = isAdmin ? '管理员权限已获取' : '⚠ 未以管理员身份运行';
-  if (!isAdmin && sbAdmin) {
-    (sbAdmin as HTMLElement).style.cursor = 'pointer';
-    (sbAdmin as HTMLElement).onclick = () => requestAdminRestart();
-  } else if (isAdmin && sbAdmin) {
+  if (sbDot) sbDot.style.background = isAdmin ? '#70D070' : 'rgba(255,255,255,0.4)';
+  if (sbAdmin) sbAdmin.textContent = isAdmin ? '管理员模式' : '标准模式（操作时自动提权）';
+  if (sbAdmin) {
     (sbAdmin as HTMLElement).style.cursor = '';
     (sbAdmin as HTMLElement).onclick = null;
-  }
-
-  // Nav 底部
-  const adminDot = document.getElementById('adminDot') as HTMLElement | null;
-  const adminStatusNav = document.getElementById('adminStatusNav');
-  if (adminDot) adminDot.style.background = isAdmin ? '#0F7B0F' : 'var(--danger)';
-  if (adminStatusNav) adminStatusNav.textContent = isAdmin ? '管理员权限已获取' : '未以管理员身份运行';
-  if (!isAdmin && adminStatusNav) {
-    (adminStatusNav as HTMLElement).style.cursor = 'pointer';
-    (adminStatusNav as HTMLElement).style.textDecoration = 'underline dotted';
-    (adminStatusNav as HTMLElement).onclick = () => requestAdminRestart();
-  } else if (isAdmin && adminStatusNav) {
-    (adminStatusNav as HTMLElement).style.cursor = '';
-    (adminStatusNav as HTMLElement).style.textDecoration = '';
-    (adminStatusNav as HTMLElement).onclick = null;
   }
 }
 

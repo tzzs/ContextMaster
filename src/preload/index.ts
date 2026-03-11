@@ -75,6 +75,9 @@ const api = {
   copyToClipboard: (text: string) =>
     invoke<boolean>(IPC.SYS_COPY_CLIPBOARD, text),
 
+  openExternal: (url: string) =>
+    invoke<void>(IPC.SYS_OPEN_EXTERNAL, url),
+
   // ── Window ──
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),
   maximizeWindow: () => ipcRenderer.invoke(IPC.WIN_MAXIMIZE),

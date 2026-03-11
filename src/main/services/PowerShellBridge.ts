@@ -89,7 +89,7 @@ if (Test-Path -LiteralPath $keyPath) {
     Remove-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Force
   }
 }
-Write-Output 'ok'
+Write-Output '"ok"'
 `.trim();
     } else {
       return `
@@ -100,7 +100,7 @@ if (-not (Test-Path -LiteralPath $keyPath)) {
   throw "注册表项不存在: ${hkcrRelativeKey}"
 }
 Set-ItemProperty -LiteralPath $keyPath -Name 'LegacyDisable' -Value '' -Type String -Force
-Write-Output 'ok'
+Write-Output '"ok"'
 `.trim();
     }
   }

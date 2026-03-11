@@ -83,6 +83,11 @@ export function registerSystemHandlers(): void {
     })
   );
 
+  ipcMain.handle(
+    IPC.SYS_OPEN_EXTERNAL,
+    wrapHandler((_event: unknown, url: string) => shell.openExternal(url))
+  );
+
   // 窗口控制
   ipcMain.handle(IPC.WIN_MINIMIZE, (_event) => {
     const win = BrowserWindow.getFocusedWindow();

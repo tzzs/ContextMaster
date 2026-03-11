@@ -25,6 +25,7 @@ export const IPC = {
   SYS_OPEN_REGEDIT:     'sys:openRegedit',
   SYS_OPEN_LOG_DIR:     'sys:openLogDir',
   SYS_COPY_CLIPBOARD:   'sys:copyClipboard',
+  SYS_OPEN_EXTERNAL:    'sys:openExternal',
   WIN_MINIMIZE:         'win:minimize',
   WIN_MAXIMIZE:         'win:maximize',
   WIN_CLOSE:            'win:close',

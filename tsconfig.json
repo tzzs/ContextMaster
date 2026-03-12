@@ -19,6 +19,6 @@
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", ".vite", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", ".vite", "dist", "tests"]
 }

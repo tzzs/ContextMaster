@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "outDir": "../.vite/tests",
+    "types": ["node", "jest"]
+  },
+  "include": [
+    "./**/*.ts",
+    "../src/shared/**/*.ts"
+  ],
+  "exclude": ["../node_modules", "../.vite", "../dist"]
+}

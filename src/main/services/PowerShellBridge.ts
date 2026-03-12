@@ -256,11 +256,15 @@ function Resolve-ExtName($clsid, $fallback) {
       $clsidKey = Get-Item -LiteralPath $clsidPath
       foreach ($valName in @('LocalizedString', 'FriendlyTypeName')) {
         $raw = $clsidKey.GetValue($valName)
-        if ($raw -and $raw.StartsWith('@')) {
-          try {
-            $resolved = [CmHelper]::ResolveIndirect($raw)
-            if ($resolved -and $resolved.Length -ge 2) { return $resolved }
-          } catch {}
+        if ($raw) {
+          if ($raw.StartsWith('@')) {
+            try {
+              $resolved = [CmHelper]::ResolveIndirect($raw)
+              if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+            } catch {}
+          } elseif ($raw.Length -ge 2) {
+            return $raw
+          }
         }
       }
       $inprocPath = Join-Path $clsidPath 'InprocServer32'

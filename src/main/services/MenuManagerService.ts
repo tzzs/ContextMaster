@@ -14,9 +14,10 @@ export class MenuManagerService {
     return this.registry.getMenuItems(scene);
   }
 
-  async enableItem(item: MenuItemEntry): Promise<void> {
-    if (item.isEnabled) return;
-    await this.registry.setItemEnabled(item.registryKey, true);
+  async enableItem(item: MenuItemEntry): Promise<{ newRegistryKey?: string }> {
+    if (item.isEnabled) return {};
+    const result = await this.registry.setItemEnabled(item.registryKey, true);
+    if (result.newRegistryKey) item.registryKey = result.newRegistryKey;
     item.isEnabled = true;
     this.history.recordOperation(
       OperationType.Enable,
@@ -26,11 +27,13 @@ export class MenuManagerService {
       'true'
     );
     log.info(`Enabled: ${item.name}`);
+    return result;
   }
 
-  async disableItem(item: MenuItemEntry): Promise<void> {
-    if (!item.isEnabled) return;
-    await this.registry.setItemEnabled(item.registryKey, false);
+  async disableItem(item: MenuItemEntry): Promise<{ newRegistryKey?: string }> {
+    if (!item.isEnabled) return {};
+    const result = await this.registry.setItemEnabled(item.registryKey, false);
+    if (result.newRegistryKey) item.registryKey = result.newRegistryKey;
     item.isEnabled = false;
     this.history.recordOperation(
       OperationType.Disable,
@@ -40,13 +43,14 @@ export class MenuManagerService {
       'false'
     );
     log.info(`Disabled: ${item.name}`);
+    return result;
   }
 
-  async toggleItem(item: MenuItemEntry): Promise<void> {
+  async toggleItem(item: MenuItemEntry): Promise<{ newRegistryKey?: string }> {
     if (item.isEnabled) {
-      await this.disableItem(item);
+      return this.disableItem(item);
     } else {
-      await this.enableItem(item);
+      return this.enableItem(item);
     }
   }
 

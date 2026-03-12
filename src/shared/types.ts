@@ -51,6 +51,7 @@ export interface ToggleItemParams {
   isEnabled: boolean;       // 当前状态（将被取反）
   name: string;
   menuScene: MenuScene;
+  type?: MenuItemType;      // ShellExt 需要特殊处理（键名重命名）
 }
 
 // 批量操作参数

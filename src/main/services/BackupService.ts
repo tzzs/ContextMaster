@@ -8,6 +8,13 @@ import { MenuManagerService } from './MenuManagerService';
 import { OperationHistoryService } from './OperationHistoryService';
 import log from '../utils/logger';
 
+/** 去掉 ShellExt registryKey 末段的 '-' 前缀，用于跨状态匹配 */
+function normalizeKey(key: string): string {
+  const sep = key.lastIndexOf('\\');
+  if (sep === -1) return key.replace(/^-+/, '');
+  return key.substring(0, sep + 1) + key.substring(sep + 1).replace(/^-+/, '');
+}
+
 export class BackupService {
   constructor(
     private readonly repo: BackupSnapshotRepo,
@@ -67,7 +74,7 @@ export class BackupService {
     const toDisable: MenuItemEntry[] = [];
 
     for (const backupItem of itemsToRestore) {
-      const current = allCurrentItems.find((i) => i.registryKey === backupItem.registryKey);
+      const current = allCurrentItems.find((i) => normalizeKey(i.registryKey) === normalizeKey(backupItem.registryKey));
       if (current && current.isEnabled !== backupItem.isEnabled) {
         current.isEnabled = backupItem.isEnabled;
         if (backupItem.isEnabled) toEnable.push(current);
@@ -102,7 +109,7 @@ export class BackupService {
 
     const diff: RestoreDiffItem[] = [];
     for (const backupItem of backupItems) {
-      const current = currentItems.find((i) => i.registryKey === backupItem.registryKey);
+      const current = currentItems.find((i) => normalizeKey(i.registryKey) === normalizeKey(backupItem.registryKey));
       if (current && current.isEnabled !== backupItem.isEnabled) {
         diff.push({ current, backup: backupItem });
       }

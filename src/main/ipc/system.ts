@@ -97,7 +97,7 @@ export function registerSystemHandlers(): void {
   ipcMain.handle(IPC.WIN_MAXIMIZE, (_event) => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) return;
-    win.isMaximized() ? win.unmaximize() : win.maximize();
+    if (win.isMaximized()) { win.unmaximize(); } else { win.maximize(); }
   });
 
   ipcMain.handle(IPC.WIN_CLOSE, (_event) => {

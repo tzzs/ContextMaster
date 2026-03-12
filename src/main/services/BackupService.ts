@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
+import * as path from 'path';
 import { dialog, BrowserWindow } from 'electron';
 import { BackupType, MenuScene, OperationType } from '../../shared/enums';
 import { BackupSnapshot, MenuItemEntry, RestoreDiffItem } from '../../shared/types';
@@ -149,7 +150,7 @@ export class BackupService {
     const checksum = createHash('sha256').update(jsonData).digest('hex');
 
     const snapshot = this.repo.insert({
-      name: `导入 · ${require('path').basename(filePath, '.cmbackup')}`,
+      name: `导入 · ${path.basename(filePath, '.cmbackup')}`,
       creationTime: new Date().toISOString(),
       type: BackupType.Manual,
       menuItemsJson: jsonData,

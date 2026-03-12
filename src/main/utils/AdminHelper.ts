@@ -2,18 +2,31 @@ import { execFileSync, execFile } from 'child_process';
 import { app } from 'electron';
 import log from './logger';
 
+// 进程级缓存，避免每次写操作都 spawn 子进程检测
+let _adminCache: boolean | null = null;
+
 /**
- * 检查当前进程是否以管理员身份运行
- * Windows: 尝试执行 net session，非管理员会抛出错误
+ * 检查当前进程是否以管理员身份运行（进程令牌已提权）
+ * 使用 Windows Security Principal API，比 net session 更可靠：
+ * net session 在域环境或特定组策略下可能误报 true
  */
 export function isAdmin(): boolean {
   if (process.platform !== 'win32') return true;
+  if (_adminCache !== null) return _adminCache;
   try {
-    execFileSync('net', ['session'], { stdio: 'ignore' });
-    return true;
+    const out = execFileSync(
+      'powershell.exe',
+      [
+        '-NonInteractive', '-NoProfile', '-Command',
+        '([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
+      ],
+      { stdio: 'pipe' }
+    ).toString().trim();
+    _adminCache = out === 'True';
   } catch {
-    return false;
+    _adminCache = false;
   }
+  return _adminCache;
 }
 
 /**

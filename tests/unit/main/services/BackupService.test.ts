@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BackupService } from '../../../../../src/main/services/BackupService';
-import { BackupSnapshotRepo } from '../../../../../src/main/data/repositories/BackupSnapshotRepo';
-import { MenuManagerService } from '../../../../../src/main/services/MenuManagerService';
-import { OperationHistoryService } from '../../../../../src/main/services/OperationHistoryService';
-import { BackupType, MenuScene, OperationType, MenuItemType } from '../../../../../src/shared/enums';
-import { MenuItemEntry } from '../../../../../src/shared/types';
+import { BackupService } from '@/main/services/BackupService';
+import { BackupSnapshotRepo } from '@main/data/repositories/BackupSnapshotRepo';
+import { MenuManagerService } from '@main/services/MenuManagerService';
+import { OperationHistoryService } from '@main/services/OperationHistoryService';
+import { BackupType, MenuScene, OperationType, MenuItemType } from '@shared/enums';
+import { MenuItemEntry } from '@shared/types';
 
 // Mock dependencies
-vi.mock('../../../../../src/main/data/repositories/BackupSnapshotRepo');
-vi.mock('../../../../../src/main/services/MenuManagerService');
-vi.mock('../../../../../src/main/services/OperationHistoryService');
+vi.mock('@main/data/repositories/BackupSnapshotRepo');
+vi.mock('@main/services/MenuManagerService');
+vi.mock('@main/services/OperationHistoryService');
 vi.mock('electron', () => ({
   dialog: {
     showSaveDialog: vi.fn(),

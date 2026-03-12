@@ -90,14 +90,14 @@ export class RegistryService {
   /**
    * 启用或禁用单个菜单条目
    * ShellExt 通过重命名键（±前缀）实现；Classic Shell 通过 LegacyDisable 值实现
-   * 返回 newRegistryKey（仅 ShellExt 会变化）
+   * ShellExt 通过重命名键（±前缀）实现，registryKey 已归一化，身份不变
    */
   async setItemEnabled(registryKey: string, enabled: boolean): Promise<{ newRegistryKey?: string }> {
     try {
       if (this.isShellExtKey(registryKey)) {
         const script = this.ps.buildShellExtToggleScript(registryKey, enabled);
         await this.ps.executeElevated<{ ok: boolean }>(script);
-        return { newRegistryKey: this.computeShellExtNewKey(registryKey, enabled) };
+        return {};
       } else {
         const script = this.ps.buildSetEnabledScript(registryKey, enabled);
         await this.ps.executeElevated<{ ok: boolean }>(script);
@@ -170,21 +170,7 @@ export class RegistryService {
     return registryKey.includes('shellex') && registryKey.includes('ContextMenuHandlers');
   }
 
-  /**
-   * 计算 ShellExt 切换后的新 registryKey
-   * enable: ...ContextMenuHandlers\-Name → ...ContextMenuHandlers\Name
-   * disable: ...ContextMenuHandlers\Name → ...ContextMenuHandlers\-Name
-   */
-  private computeShellExtNewKey(registryKey: string, enable: boolean): string {
-    const lastSlash = registryKey.lastIndexOf('\\');
-    const parentPath = registryKey.substring(0, lastSlash);
-    const keyName = registryKey.substring(lastSlash + 1);
-    const cleanName = keyName.replace(/^-+/, '');
-    const newKeyName = enable ? cleanName : `-${cleanName}`;
-    return `${parentPath}\\${newKeyName}`;
-  }
-
-  private inferSource(subKeyName: string): string {
+private inferSource(subKeyName: string): string {
     return subKeyName || '';
   }
 

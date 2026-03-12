@@ -15,7 +15,8 @@ dist/
 # 编辑器
 .vs/
 .idea/
-.claude/
+.claude/settings.local.json
+.claude/worktrees/
 *.swp
 *.swo
 *~

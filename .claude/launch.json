@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ContextMaster (dev)",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "npm", "start"],
+      "port": 5173
+    }
+  ]
+}

@@ -322,7 +322,7 @@ $result = @($handlers | ForEach-Object {
   $cleanName   = $handlerKeyName -replace '^-+', ''
   $displayName = Resolve-ExtName $clsid $cleanName
   $isEnabled   = -not $handlerKeyName.StartsWith('-')
-  $regKey = '${shellexSubPath}\\' + $handlerKeyName
+  $regKey = '${shellexSubPath}\\' + $cleanName
   [PSCustomObject]@{
     name        = [string]$displayName
     command     = [string]$clsid
@@ -359,9 +359,10 @@ $parentPath = '${psParentPath}'
 $currentKey = '${psCurrentKeyName}'
 $newKey = '${psNewKeyName}'
 $fullPath = Join-Path $parentPath $currentKey
-if (Test-Path -LiteralPath $fullPath) {
-  Rename-Item -LiteralPath $fullPath -NewName $newKey -Force
+if (-not (Test-Path -LiteralPath $fullPath)) {
+  throw "ShellExt key not found: $fullPath"
 }
+Rename-Item -LiteralPath $fullPath -NewName $newKey -Force
 Write-Output '{"ok":true}'
 `.trim();
   }

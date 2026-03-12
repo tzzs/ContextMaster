@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, MockedObject } from 'vitest';
 import { RegistryService } from '@/main/services/RegistryService';
 import { PowerShellBridge } from '@/main/services/PowerShellBridge';
 import { MenuScene, MenuItemType } from '@shared/enums';
@@ -8,7 +8,7 @@ vi.mock('@/main/services/PowerShellBridge');
 
 describe('RegistryService', () => {
   let service: RegistryService;
-  let mockPs: PowerShellBridge;
+  let mockPs: MockedObject<PowerShellBridge>;
 
   beforeEach(() => {
     mockPs = {
@@ -18,14 +18,14 @@ describe('RegistryService', () => {
       buildShellExtToggleScript: vi.fn(),
       execute: vi.fn(),
       executeElevated: vi.fn(),
-    } as unknown as PowerShellBridge;
+    } as MockedObject<PowerShellBridge>;
     
     service = new RegistryService(mockPs);
   });
 
   describe('getMenuItems', () => {
     it('should return empty array when no items found', async () => {
-      mockPs.execute.mockResolvedValue([]);
+      (mockPs.execute as ReturnType<typeof vi.fn>).mockResolvedValue([]);
       
       const result = await service.getMenuItems(MenuScene.Desktop);
       

@@ -140,11 +140,11 @@ describe('AdminHelper', () => {
     it('should execute PowerShell to restart with admin privileges', () => {
       const mockExePath = 'C:\\Program Files\\ContextMaster\\ContextMaster.exe';
       getMockedAppGetPath().mockReturnValue(mockExePath);
-      getMockedExecFile().mockImplementation((cmd, args, callback) => {
+      getMockedExecFile().mockImplementation((_cmd, _args, callback) => {
         if (callback && typeof callback === 'function') {
-          callback(null, '', '');
+          (callback as (error: null, stdout: string, stderr: string) => void)(null, '', '');
         }
-        return {} as any;
+        return {} as ReturnType<typeof execFile>;
       });
       vi.useFakeTimers();
 
@@ -171,11 +171,11 @@ describe('AdminHelper', () => {
       const mockExePath = 'C:\\Program Files\\ContextMaster\\ContextMaster.exe';
       getMockedAppGetPath().mockReturnValue(mockExePath);
       const mockError = new Error('Access denied');
-      getMockedExecFile().mockImplementation((cmd, args, callback) => {
+      getMockedExecFile().mockImplementation((_cmd, _args, callback) => {
         if (callback && typeof callback === 'function') {
-          callback(mockError, '', '');
+          (callback as (error: Error, stdout: string, stderr: string) => void)(mockError, '', '');
         }
-        return {} as any;
+        return {} as ReturnType<typeof execFile>;
       });
 
       restartAsAdmin();

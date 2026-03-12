@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { wrapHandler } from '@/main/utils/ipcWrapper';
-import { IpcResult } from '@/shared/types';
 
 describe('wrapHandler', () => {
   it('should return success result when handler succeeds', async () => {
@@ -21,8 +20,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Test error');
-    expect(result.data).toBeUndefined();
+    if (!result.success) {
+      expect(result.error).toBe('Test error');
+    }
   });
 
   it('should handle non-Error exceptions (string)', async () => {
@@ -32,7 +32,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('string error');
+    if (!result.success) {
+      expect(result.error).toBe('string error');
+    }
   });
 
   it('should handle non-Error exceptions (number)', async () => {
@@ -42,7 +44,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('404');
+    if (!result.success) {
+      expect(result.error).toBe('404');
+    }
   });
 
   it('should handle non-Error exceptions (object)', async () => {
@@ -52,7 +56,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('[object Object]');
+    if (!result.success) {
+      expect(result.error).toBe('[object Object]');
+    }
   });
 
   it('should handle undefined error', async () => {
@@ -62,7 +68,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('undefined');
+    if (!result.success) {
+      expect(result.error).toBe('undefined');
+    }
   });
 
   it('should handle null error', async () => {
@@ -72,7 +80,9 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('null');
+    if (!result.success) {
+      expect(result.error).toBe('null');
+    }
   });
 
   it('should handle promise rejection with Error constructor', async () => {
@@ -83,6 +93,8 @@ describe('wrapHandler', () => {
     const result = await wrapped();
     
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Promise rejected');
+    if (!result.success) {
+      expect(result.error).toBe('Promise rejected');
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, MockedObject } from 'vitest';
 import { MenuManagerService } from '@/main/services/MenuManagerService';
 import { RegistryService } from '@/main/services/RegistryService';
 import { OperationHistoryService } from '@/main/services/OperationHistoryService';
@@ -18,8 +18,8 @@ vi.mock('@/main/utils/logger', () => ({
 
 describe('MenuManagerService', () => {
   let service: MenuManagerService;
-  let mockRegistry: RegistryService;
-  let mockHistory: OperationHistoryService;
+  let mockRegistry: MockedObject<RegistryService>;
+  let mockHistory: MockedObject<OperationHistoryService>;
 
   beforeEach(() => {
     mockRegistry = {
@@ -28,11 +28,11 @@ describe('MenuManagerService', () => {
       createRollbackPoint: vi.fn(),
       commitTransaction: vi.fn(),
       rollback: vi.fn(),
-    } as unknown as RegistryService;
+    } as MockedObject<RegistryService>;
 
     mockHistory = {
       recordOperation: vi.fn(),
-    } as unknown as OperationHistoryService;
+    } as MockedObject<OperationHistoryService>;
 
     service = new MenuManagerService(mockRegistry, mockHistory);
   });

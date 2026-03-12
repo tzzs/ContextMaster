@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, MockedObject } from 'vitest';
 import { ipcMain } from 'electron';
 import { registerRegistryHandlers } from '@/main/ipc/registry';
 import { MenuManagerService } from '@/main/services/MenuManagerService';
@@ -18,7 +18,7 @@ vi.mock('@/main/utils/ipcWrapper', () => ({
 }));
 
 describe('IPC Registry Handlers', () => {
-  let mockMenuManager: MenuManagerService;
+  let mockMenuManager: MockedObject<MenuManagerService>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,7 +28,7 @@ describe('IPC Registry Handlers', () => {
       toggleItem: vi.fn(),
       batchEnable: vi.fn(),
       batchDisable: vi.fn(),
-    } as unknown as MenuManagerService;
+    } as MockedObject<MenuManagerService>;
 
     registerRegistryHandlers(mockMenuManager);
   });

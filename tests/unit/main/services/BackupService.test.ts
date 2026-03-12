@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, MockedObject } from 'vitest';
 import { BackupService } from '@/main/services/BackupService';
 import { BackupSnapshotRepo } from '@main/data/repositories/BackupSnapshotRepo';
 import { MenuManagerService } from '@main/services/MenuManagerService';
@@ -33,9 +33,9 @@ vi.mock('crypto', () => ({
 
 describe('BackupService', () => {
   let service: BackupService;
-  let mockRepo: BackupSnapshotRepo;
-  let mockMenuManager: MenuManagerService;
-  let mockHistory: OperationHistoryService;
+  let mockRepo: MockedObject<BackupSnapshotRepo>;
+  let mockMenuManager: MockedObject<MenuManagerService>;
+  let mockHistory: MockedObject<OperationHistoryService>;
 
   beforeEach(() => {
     mockRepo = {
@@ -43,17 +43,17 @@ describe('BackupService', () => {
       findAll: vi.fn().mockReturnValue([]),
       findById: vi.fn(),
       delete: vi.fn(),
-    } as unknown as BackupSnapshotRepo;
+    } as MockedObject<BackupSnapshotRepo>;
 
     mockMenuManager = {
       getMenuItems: vi.fn(),
       batchEnable: vi.fn(),
       batchDisable: vi.fn(),
-    } as unknown as MenuManagerService;
+    } as MockedObject<MenuManagerService>;
 
     mockHistory = {
       recordOperation: vi.fn(),
-    } as unknown as OperationHistoryService;
+    } as MockedObject<OperationHistoryService>;
 
     service = new BackupService(mockRepo, mockMenuManager, mockHistory);
   });
@@ -116,8 +116,8 @@ describe('BackupService', () => {
   describe('getAllBackups', () => {
     it('should return all backups from repo', () => {
       const mockBackups = [
-        { id: 1, name: 'Backup 1' },
-        { id: 2, name: 'Backup 2' },
+        { id: 1, name: 'Backup 1', creationTime: new Date().toISOString(), type: BackupType.Manual, menuItemsJson: '[]', sha256Checksum: 'abc123' },
+        { id: 2, name: 'Backup 2', creationTime: new Date().toISOString(), type: BackupType.Auto, menuItemsJson: '[]', sha256Checksum: 'def456' },
       ];
       mockRepo.findAll.mockReturnValue(mockBackups);
 

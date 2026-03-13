@@ -298,6 +298,16 @@ function Resolve-ExtName($clsid, $fallback) {
           }
         }
       }
+      # Level 1.5: MUIVerb（部分扩展如 gvim 通过此键注册显示名）
+      $muiVerb = $clsidKey.GetValue('MUIVerb')
+      if ($muiVerb) {
+        if ($muiVerb.StartsWith('@')) {
+          try {
+            $resolved = [CmHelper]::ResolveIndirect($muiVerb)
+            if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+          } catch {}
+        } elseif ($muiVerb.Length -ge 2) { return $muiVerb }
+      }
       # Level 2: CLSID 默认值（与参考脚本 (default) 逻辑一致，可靠、ASCII-safe）
       $def = $clsidKey.GetValue('')
       if ($def -and $def.Length -ge 2) { return [string]$def }
@@ -321,6 +331,14 @@ $result = @($handlers | ForEach-Object {
   $displayName = Format-DisplayName $displayName
   $isEnabled   = -not $handlerKeyName.StartsWith('-')
   $regKey = '${shellexSubPath}\\' + $cleanName
+  $dllPath = $null
+  if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
+    $inprocPath = 'HKCR:\\CLSID\\' + $clsid + '\\InprocServer32'
+    if (Test-Path -LiteralPath $inprocPath) {
+      $raw = (Get-Item -LiteralPath $inprocPath).GetValue('')
+      if ($raw) { $dllPath = [System.Environment]::ExpandEnvironmentVariables($raw) }
+    }
+  }
   [PSCustomObject]@{
     name        = [string]$displayName
     command     = [string]$clsid
@@ -330,6 +348,7 @@ $result = @($handlers | ForEach-Object {
     registryKey = [string]$regKey
     subKeyName  = [string]$handlerKeyName
     itemType    = 'ShellExt'
+    dllPath     = $dllPath
   }
 })
 $result | ConvertTo-Json -Compress -Depth 3

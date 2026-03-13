@@ -36,6 +36,7 @@ interface PsMenuItemRaw {
   registryKey: string;
   subKeyName: string;
   itemType?: string;  // 'ShellExt' for shell extensions
+  dllPath?: string | null;
 }
 
 export class RegistryService {
@@ -92,6 +93,7 @@ export class RegistryService {
         menuScene: scene,
         registryKey: r.registryKey,
         type: this.determineType(r.itemType, r.command),
+        dllPath: r.dllPath ?? null,
       }));
 
       // 写入缓存

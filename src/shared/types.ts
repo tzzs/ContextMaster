@@ -16,6 +16,7 @@ export interface MenuItemEntry {
   menuScene: MenuScene;
   registryKey: string;
   type: MenuItemType;
+  dllPath?: string | null;   // 仅 ShellExt 类型有值，指向 InprocServer32 DLL
 }
 
 // 操作记录

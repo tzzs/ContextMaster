@@ -212,9 +212,8 @@ export function showDetail(id: number): void {
     }
     return `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
   })();
-  const regCmdPath = isShellExt
-    ? `(COM DLL，CLSID: ${item.command})`
-    : `${regItemPath}\\command`;
+  const regCmdPath = `${regItemPath}\\command`;
+  // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
   const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const disabledNoteContent = isShellExt
@@ -278,10 +277,17 @@ export function showDetail(id: number): void {
       ${legacyNote}
     </div>
 
-    <div class="detail-field">
-      <div class="detail-field-label">${isShellExt ? t('item.comObject') : t('item.commandSubkey')}</div>
-      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    ${isShellExt ? `<div class="detail-field">
+      <div class="detail-field-label">COM 标识符</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.command)}</div>
     </div>
+    ${item.dllPath ? `<div class="detail-field">
+      <div class="detail-field-label">提供程序 DLL</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.dllPath)}</div>
+    </div>` : ''}` : `<div class="detail-field">
+      <div class="detail-field-label">命令子键路径</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    </div>`}
 
     <div class="detail-field">
       <div class="detail-field-label">${t('item.openInRegedit')}</div>

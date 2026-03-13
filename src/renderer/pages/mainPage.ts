@@ -425,17 +425,31 @@ export function restoreSceneTitle(scene: MenuScene): void {
 // ── 预加载其余场景的 badge 数量 ──
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
   const allScenes = Object.values(MenuScene) as MenuScene[];
-  const scenesToLoad = allScenes.filter((s) => s !== skipScene);
-  
-  await Promise.all(
-    scenesToLoad.map(async (scene) => {
-      const result = await window.api.getMenuItems(scene);
-      const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) {
-        badgeEl.textContent = result.success ? String(result.data.length) : '?';
+  const targetScenes = allScenes.filter((scene) => scene !== skipScene);
+
+  // 并行加载所有场景的 badge 数量
+  const results = await Promise.all(
+    targetScenes.map(async (scene) => {
+      try {
+        const result = await window.api.getMenuItems(scene);
+        return { scene, result };
+      } catch (e) {
+        return { scene, result: { success: false, error: String(e) } };
       }
     })
   );
+
+  // 更新所有 badge
+  for (const { scene, result } of results) {
+    const badgeEl = document.getElementById(`badge-${scene}`);
+    if (!badgeEl) continue;
+
+    if (result.success && 'data' in result) {
+      badgeEl.textContent = String(result.data.length);
+    } else {
+      badgeEl.textContent = '?';
+    }
+  }
 }
 
 // 挂载到 window 供 HTML inline onclick 调用

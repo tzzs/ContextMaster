@@ -6,7 +6,11 @@
       "Bash(cp:*)",
       "Bash(git:*)",
       "Bash(pnpm:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Read(**)",
+      "Write(src/**)",
+      "Write(tests/**)",
+      "Write(docs/**)"
     ]
   }
 }

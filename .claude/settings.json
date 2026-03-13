@@ -1,14 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c \":*)",
-      "Bash(dotnet *)",
-      "Bash(grep *)",
-      "Bash(mkdir *)",
-      "Bash(mv src/*)",
-      "Bash(mv temp*)",
-      "Bash(cp *)",
-      "Bash(rm -rf src/ContextMaster.UI/obj src/ContextMaster.UI/bin)"
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(git:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx vitest:*)",
+      "Read(**)",
+      "Write(src/**)",
+      "Write(tests/**)",
+      "Write(docs/**)"
     ]
   }
 }

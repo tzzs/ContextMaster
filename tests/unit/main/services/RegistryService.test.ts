@@ -61,6 +61,105 @@ describe('RegistryService', () => {
     });
   });
 
+  describe('名称净化（@ 间接字符串兜底）', () => {
+    it('以 @ 开头的名称应被 subKeyName 替换', async () => {
+      const rawItems = [{
+        name: '@%SystemRoot%\\system32\\shell32.dll,-1234',
+        command: '',
+        iconPath: null,
+        isEnabled: true,
+        source: '',
+        registryKey: 'DesktopBackground\\Shell\\TestItem',
+        subKeyName: 'TestItem',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].name).toBe('TestItem');
+    });
+
+    it('正常名称不应被替换', async () => {
+      const rawItems = [{
+        name: '在桌面上显示',
+        command: '',
+        iconPath: null,
+        isEnabled: true,
+        source: '',
+        registryKey: 'DesktopBackground\\Shell\\TestItem',
+        subKeyName: 'TestItem',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].name).toBe('在桌面上显示');
+    });
+
+    it('subKeyName 为空时 @ 名称应保留原值', async () => {
+      const rawItems = [{
+        name: '@unresolved',
+        command: '',
+        iconPath: null,
+        isEnabled: true,
+        source: '',
+        registryKey: 'DesktopBackground\\Shell\\',
+        subKeyName: '',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].name).toBe('@unresolved');
+    });
+
+    it('ShellExt 条目的 @ 名称也应净化为 subKeyName', async () => {
+      const shellextItems = [{
+        name: '@%SystemRoot%\\system32\\shell32.dll,-9999',
+        command: '{645FF040-5081-101B-9F08-00AA002F954E}',
+        iconPath: null,
+        isEnabled: true,
+        source: 'DesktopSlideshow',
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\DesktopSlideshow',
+        subKeyName: 'DesktopSlideshow',
+        itemType: 'ShellExt',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('DesktopSlideshow');
+    });
+
+    it('模拟 DesktopSlideshow 问题场景：错误名称应被键名替换', async () => {
+      // 模拟 Level 3 DLL 扫描可能返回的错误名称（现已移除该逻辑）
+      // RegistryService 的 @ 兜底层作为最终保险
+      const shellextItems = [{
+        name: '@windows.immersivecontrolpanel.dll,-1',
+        command: '{2CC2D03E-B04A-43BE-A6BE-8C20E6A64F87}',
+        iconPath: null,
+        isEnabled: true,
+        source: 'DesktopSlideshow',
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\DesktopSlideshow',
+        subKeyName: 'DesktopSlideshow',
+        itemType: 'ShellExt',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].name).toBe('DesktopSlideshow');
+      expect(result[0].name).not.toContain('@');
+      expect(result[0].name).not.toContain('电池');
+    });
+  });
+
   describe('transaction management', () => {
     it('should create rollback point correctly', () => {
       const items = [

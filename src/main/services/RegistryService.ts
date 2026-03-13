@@ -1,6 +1,7 @@
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { PowerShellBridge } from './PowerShellBridge';
+import { RegistryCache } from '../utils/RegistryCache';
 import log from '../utils/logger';
 
 // 与 C# RegistryService._sceneRegistryPaths 完全一致
@@ -39,21 +40,32 @@ interface PsMenuItemRaw {
 
 export class RegistryService {
   private readonly ps: PowerShellBridge;
+  private readonly cache: RegistryCache;
   /** 事务回滚数据：registryKey → 原始 isEnabled */
   private rollbackData = new Map<string, boolean>();
   private inTransaction = false;
   private nextId = 1;
 
-  constructor(ps: PowerShellBridge) {
+  constructor(ps: PowerShellBridge, cache?: RegistryCache) {
     this.ps = ps;
+    this.cache = cache ?? new RegistryCache();
   }
 
   /**
    * 获取指定场景下的所有菜单条目（Classic Shell + Shell 扩展）
+   * 优先从缓存读取，缓存未命中时执行 PowerShell 查询
    */
   async getMenuItems(scene: MenuScene): Promise<MenuItemEntry[]> {
+    // 尝试从缓存读取
+    const cached = this.cache.get(scene);
+    if (cached) {
+      log.debug(`RegistryService: Returning cached data for ${scene} (${cached.length} items)`);
+      return cached;
+    }
+
     const basePath = SCENE_REGISTRY_PATHS[scene];
     const shellexPath = SCENE_SHELLEX_PATHS[scene];
+    
     try {
       // 读取 Classic Shell 命令
       const script = this.ps.buildGetItemsScript(basePath);
@@ -70,9 +82,9 @@ export class RegistryService {
         log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
       }
 
-      return [...items, ...shellexItems].map((r) => ({
+      const result = [...items, ...shellexItems].map((r) => ({
         id: this.nextId++,
-        name: r.name,
+        name: (r.name && !r.name.startsWith('@')) ? r.name : (r.subKeyName || r.name),
         command: r.command,
         iconPath: r.iconPath,
         isEnabled: r.isEnabled,
@@ -81,6 +93,11 @@ export class RegistryService {
         registryKey: r.registryKey,
         type: this.determineType(r.itemType),
       }));
+
+      // 写入缓存
+      this.cache.set(scene, result);
+      
+      return result;
     } catch (e) {
       log.error(`getMenuItems(${scene}) failed:`, e);
       throw new Error(`读取注册表场景 ${scene} 失败: ${(e as Error).message}`);
@@ -155,6 +172,34 @@ export class RegistryService {
     return `${HKCR_PREFIX}\\${SCENE_REGISTRY_PATHS[scene]}`;
   }
 
+  /**
+   * 清除指定场景的缓存
+   */
+  invalidateCache(scene: MenuScene): void {
+    this.cache.invalidate(scene);
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  invalidateAllCache(): void {
+    this.cache.invalidateAll();
+  }
+
+  /**
+   * 获取缓存统计信息
+   */
+  getCacheStats(): ReturnType<RegistryCache['getStats']> {
+    return this.cache.getStats();
+  }
+
+  /**
+   * 打印缓存统计日志
+   */
+  logCacheStats(): void {
+    this.cache.logStats();
+  }
+
   private async setItemEnabledInternal(registryKey: string, enabled: boolean): Promise<void> {
     if (this.isShellExtKey(registryKey)) {
       const script = this.ps.buildShellExtToggleScript(registryKey, enabled);
@@ -170,7 +215,7 @@ export class RegistryService {
     return registryKey.includes('shellex') && registryKey.includes('ContextMenuHandlers');
   }
 
-private inferSource(subKeyName: string): string {
+  private inferSource(subKeyName: string): string {
     return subKeyName || '';
   }
 

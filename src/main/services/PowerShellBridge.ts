@@ -121,13 +121,36 @@ ${script}
     return `
 $ErrorActionPreference = 'SilentlyContinue'
 New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
+try {
+  Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices; using System.Text;
+public class CmShell {
+    [DllImport("shlwapi.dll", CharSet=CharSet.Unicode)]
+    static extern int SHLoadIndirectString(string s, StringBuilder b, int c, IntPtr r);
+    public static string Resolve(string s) {
+        if (string.IsNullOrEmpty(s) || !s.StartsWith("@")) return null;
+        var sb = new StringBuilder(512);
+        return SHLoadIndirectString(s, sb, 512, IntPtr.Zero) == 0 ? sb.ToString() : null;
+    }
+}
+'@ -ErrorAction Stop
+} catch {}
+function Resolve-MenuName($raw) {
+  if (-not $raw) { return $null }
+  if ($raw -match '^@') {
+    try { $r = [CmShell]::Resolve($raw); if ($r) { return $r } } catch {}
+    return $null
+  }
+  return $raw
+}
 $basePath = 'HKCR:\\${hkcrSubPath}'
 if (-not (Test-Path -LiteralPath $basePath)) { Write-Output '[]'; exit }
 $subKeys = Get-ChildItem -LiteralPath $basePath | Where-Object { $_.PSIsContainer }
 $result = @($subKeys | ForEach-Object {
   $key = $_
   $keyName = $key.PSChildName
-  $name = $key.GetValue('')
+  $name = Resolve-MenuName ($key.GetValue('MUIVerb'))
+  if (-not $name) { $name = Resolve-MenuName ($key.GetValue('')) }
   if (-not $name) { $name = $keyName }
   $iconPath = $key.GetValue('Icon')
   $isEnabled = ($key.GetValue('LegacyDisable') -eq $null)
@@ -190,7 +213,7 @@ Write-Output '{"ok":true}'
    * 构建枚举 shellex\ContextMenuHandlers 下所有 Shell 扩展的脚本
    * 使用四级级联策略解析本地化名称：
    *  1. LocalizedString/FriendlyTypeName → SHLoadIndirectString（解析 @DLL,-ID 格式）
-   *  2. InprocServer32 DLL 字符串表 → 通用字符串质量筛选（LoadLibraryEx + LoadString）
+   *  2. DLL VersionInfo（FileDescription/ProductName/InternalName/OriginalFilename）
    *  3. CLSID 默认值
    *  4. 处理程序键名（最终兜底）
    * CmHelper.dll 编译后缓存至 %LOCALAPPDATA%\ContextMaster\，避免重复编译开销
@@ -210,33 +233,13 @@ if (-not $helperLoaded) {
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Collections.Generic;
 public class CmHelper {
-    const uint LOAD_AS_DATA = 2u;
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     static extern int SHLoadIndirectString(string s, StringBuilder buf, int cap, IntPtr r);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    static extern IntPtr LoadLibraryEx(string p, IntPtr h, uint f);
-    [DllImport("kernel32.dll")]
-    static extern bool FreeLibrary(IntPtr h);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern int LoadString(IntPtr h, uint id, StringBuilder buf, int cap);
     public static string ResolveIndirect(string s) {
         if (string.IsNullOrEmpty(s) || !s.StartsWith("@")) return null;
         var sb = new StringBuilder(512);
         return SHLoadIndirectString(s, sb, 512, IntPtr.Zero) == 0 ? sb.ToString() : null;
-    }
-    public static string[] ReadDllStrings(string dll, uint from, uint to) {
-        var list = new List<string>();
-        var hMod = LoadLibraryEx(dll, IntPtr.Zero, LOAD_AS_DATA);
-        if (hMod == IntPtr.Zero) return list.ToArray();
-        try {
-            for (uint i = from; i <= to; i++) {
-                var sb = new StringBuilder(512);
-                if (LoadString(hMod, i, sb, 512) > 0) list.Add(sb.ToString());
-            }
-        } finally { FreeLibrary(hMod); }
-        return list.ToArray();
     }
 }
 '@
@@ -249,11 +252,34 @@ public class CmHelper {
     try { Add-Type -TypeDefinition $src -ErrorAction Stop; $helperLoaded = $true } catch {}
   }
 }
+# 常见 Shell 扩展友好名称映射表
+$friendlyNames = @{
+  '{90AA3A4E-1CBA-4233-B8BB-535773D48449}' = 'Windows Defender'
+  '{09A47860-11B0-4DA5-AFA5-26D86198A780}' = 'Windows Defender'
+  '{D969A300-E7FF-11d0-A93B-00A0C90F2719}' = '发送到'
+  '{C2FBB630-2971-11D1-A18C-00C04FD75D13}' = '复制到文件夹'
+  '{C2FBB631-2971-11D1-A18C-00C04FD75D13}' = '移动到文件夹'
+  '{B4FB3F98-C1EA-428d-A78A-D1F5659CBA93}' = 'Windows Media Player'
+  '{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}' = 'Windows 传真和扫描'
+  '{E57CBC10-2D49-4B66-B1AA-74F08D5B8A01}' = 'Windows PowerShell'
+  '{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}' = 'Windows 搜索'
+  '{F978C3D4-6F3D-4360-99F1-5F3C7A2C8C0D}' = 'OneDrive'
+  '{A0396A93-DC06-4AEF-BEAF-9A8F65E1D6C0}' = 'OneDrive'
+  '{8AB3A2F0-EF1C-4E99-8E6A-0D6E0B88C5A5}' = 'OneDrive'
+  '{3C8A3F87-34FB-4A3B-8B5A-6F5E3C8D9A2B}' = 'Visual Studio'
+  '{9F6C8B1E-3D4A-4C9F-B5E2-7A8D9C0F1E3B}' = 'Git'
+  '{A8B9C0D1-E2F3-4A5B-6C7D-8E9F0A1B2C3D}' = '7-Zip'
+}
 function Resolve-ExtName($clsid, $fallback) {
+  # Level 0: 友好名称映射表
+  if ($friendlyNames.ContainsKey($clsid)) {
+    return $friendlyNames[$clsid]
+  }
   if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
     $clsidPath = 'HKCR:\\CLSID\\' + $clsid
     if (Test-Path -LiteralPath $clsidPath) {
       $clsidKey = Get-Item -LiteralPath $clsidPath
+      # Level 1: LocalizedString/FriendlyTypeName
       foreach ($valName in @('LocalizedString', 'FriendlyTypeName')) {
         $raw = $clsidKey.GetValue($valName)
         if ($raw) {
@@ -270,51 +296,44 @@ function Resolve-ExtName($clsid, $fallback) {
       $inprocPath = Join-Path $clsidPath 'InprocServer32'
       if (Test-Path -LiteralPath $inprocPath) {
         $dllPath = (Get-Item -LiteralPath $inprocPath).GetValue('')
-        # Fix 1: 展开 %SystemRoot% 等环境变量，否则 Test-Path 永远返回 $false
+        # 展开 %SystemRoot% 等环境变量
         if ($dllPath) {
           $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllPath)
         }
         if ($dllPath -and (Test-Path -LiteralPath $dllPath)) {
-          # Level 2: 通用字符串质量筛选（过滤后取第一条，无硬编码词表，无长度限制）
-          try {
-            $candidates = [CmHelper]::ReadDllStrings($dllPath, 1, 1000) |
-              Where-Object {
-                $_.Length -ge 2 -and
-                $_ -notmatch '[\\\\/:*?<>|]' -and
-                $_ -notmatch '^\\{' -and
-                $_ -notmatch '^https?://' -and
-                $_ -notmatch '%[0-9A-Za-z]' -and
-                $_ -notmatch '\\{[0-9]+\\}' -and
-                $_ -notmatch '[\\r\\n\\t]' -and
-                $_ -notmatch '^[0-9]' -and
-                $_ -notmatch '[\\u3002\\uff01\\uff1f]' -and
-                $_ -notmatch '[.!?]$'
-              }
-            $pool = $candidates | Where-Object { $_ -match '[^\\x00-\\x7F]' }
-            if (-not $pool) { $pool = $candidates }
-            $best = $pool | Select-Object -First 1
-            if ($best) { return $best }
-          } catch {}
-          # Level 2.5: DLL VersionInfo（适用于英文/日文等非中文软件）
+          # Level 2: DLL VersionInfo（FileDescription / ProductName / InternalName / OriginalFilename）
           try {
             $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
             $desc = $null
-            if ($ver.FileDescription -and $ver.FileDescription.Length -ge 2) {
-              $desc = $ver.FileDescription
-            } elseif ($ver.ProductName -and $ver.ProductName.Length -ge 2) {
-              $desc = $ver.ProductName
+            foreach ($field in @($ver.FileDescription, $ver.ProductName, $ver.InternalName, $ver.OriginalFilename)) {
+              if ($field -and $field.Length -ge 2 -and $field.Length -le 80 -and
+                  $field -notmatch '^\\{' -and $field -notmatch '[\\\\/:*?<>|]') {
+                $desc = $field
+                break
+              }
             }
-            if ($desc -and $desc.Length -le 80 -and $desc -notmatch '^\\{' -and $desc -notmatch '[\\\\/:*?<>|]') {
-              return $desc
-            }
+            if ($desc) { return $desc }
           } catch {}
         }
       }
+      # Level 3: CLSID 默认值
       $def = $clsidKey.GetValue('')
-      if ($def) { return [string]$def }
+      if ($def -and $def.Length -ge 2) { return [string]$def }
     }
   }
   return $fallback
+}
+function Format-DisplayName($name) {
+  if (-not $name) { return $name }
+  # 清理多余空格
+  $name = $name -replace '\s+', ' '
+  # 去除首尾空格
+  $name = $name.Trim()
+  # 规范化大小写（首字母大写）
+  if ($name.Length -gt 1) {
+    $name = $name.Substring(0,1).ToUpper() + $name.Substring(1).ToLower()
+  }
+  return $name
 }
 $shellexPath = 'HKCR:\\${shellexSubPath}'
 if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }
@@ -325,6 +344,7 @@ $result = @($handlers | ForEach-Object {
   if (-not $clsid) { $clsid = $handlerKeyName }
   $cleanName   = $handlerKeyName -replace '^-+', ''
   $displayName = Resolve-ExtName $clsid $cleanName
+  $displayName = Format-DisplayName $displayName
   $isEnabled   = -not $handlerKeyName.StartsWith('-')
   $regKey = '${shellexSubPath}\\' + $cleanName
   [PSCustomObject]@{

@@ -254,26 +254,18 @@ public class CmHelper {
   }
 }
 function Resolve-ExtName($clsid, $fallback, $directName = $null) {
-  # Level 0: handler key 的非 CLSID Default 值（最贴近当前系统实际）
-  # 支持 @dll,-id 和 ms-resource: 两种间接格式，以及普通字符串
-  if ($directName) {
-    if ($directName.StartsWith('@') -or $directName.StartsWith('ms-resource:')) {
-      try {
-        $resolved = [CmHelper]::ResolveIndirect($directName)
-        if ($resolved -and $resolved.Length -ge 2) { return $resolved }
-      } catch {}
-    } else {
-      $lc = $directName.ToLower()
-      if ($lc -notmatch '外壳服务对象' -and
-          $lc -notmatch 'shell service object' -and
-          $lc -notmatch 'shell extension') { return $directName }
-    }
+  # Level 0: directName（仅间接格式：@dll,-id 或 ms-resource:，最高本地化优先级）
+  if ($directName -and ($directName.StartsWith('@') -or $directName.StartsWith('ms-resource:'))) {
+    try {
+      $resolved = [CmHelper]::ResolveIndirect($directName)
+      if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+    } catch {}
   }
   if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
     $clsidPath = 'HKCR:\\CLSID\\' + $clsid
     if (Test-Path -LiteralPath $clsidPath) {
       $clsidKey = Get-Item -LiteralPath $clsidPath
-      # Level 1: LocalizedString（专为 Shell 扩展显示名设计）
+      # Level 1: LocalizedString（专为 Shell 扩展显示名设计，自动多语言）
       # 注意：FriendlyTypeName 是 COM 类型描述（如"外壳服务对象"），不是菜单名，已移除
       $raw = $clsidKey.GetValue('LocalizedString')
       if ($raw) {
@@ -302,16 +294,77 @@ function Resolve-ExtName($clsid, $fallback, $directName = $null) {
           } catch {}
         } elseif ($muiVerb.Length -ge 2) { return $muiVerb }
       }
+      # Level 1.7: CommandStore 反向查找（ExplorerCommandHandler = $clsid → MUIVerb）
+      # 适用于通过 ImplementsVerbs 注册但 CLSID 自身无本地化字段的 shell 扩展（如 Taskband Pin）
+      if ($cmdStoreVerbs.ContainsKey($clsid)) { return $cmdStoreVerbs[$clsid] }
       # Level 2: CLSID 默认值（与参考脚本 (default) 逻辑一致，可靠、ASCII-safe）
       $def = $clsidKey.GetValue('')
       if ($def -and $def.Length -ge 2) { return [string]$def }
     }
+    # Level 2.5: InprocServer32 DLL FileDescription/ProductName
+    # 适用于无本地化注册表字段的第三方扩展（如 YunShellExt → 阿里云盘）
+    $inprocPath2 = $clsidPath + '\\InprocServer32'
+    if (Test-Path -LiteralPath $inprocPath2) {
+      $dllRaw2 = (Get-Item -LiteralPath $inprocPath2).GetValue('')
+      if ($dllRaw2) {
+        $dllExp = [System.Environment]::ExpandEnvironmentVariables($dllRaw2)
+        if ($dllExp -and (Test-Path -LiteralPath $dllExp -PathType Leaf)) {
+          try {
+            $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllExp)
+            foreach ($cand in @($vi.FileDescription, $vi.ProductName)) {
+              if ($cand -and $cand.Length -ge 2 -and $cand.Length -le 64) {
+                $lc = $cand.ToLower()
+                if ($lc -notmatch 'shell\s*(extension|ext|common)' -and
+                    $lc -notmatch 'context\s*menu' -and
+                    $lc -notmatch 'ctx\s*menu' -and
+                    $lc -notmatch '外壳服务对象' -and
+                    $lc -notmatch '\bshell service' -and
+                    $lc -notmatch '\bcom (object|server|class)' -and
+                    $lc -notmatch '\.dll$' -and
+                    $lc -notmatch '^microsoft windows') {
+                  return $cand
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+  }
+  # Level 3: directName 普通字符串兜底（优先 CLSID 本地化后再用英文名）
+  if ($directName -and
+      -not $directName.StartsWith('@') -and
+      -not $directName.StartsWith('ms-resource:')) {
+    $lc = $directName.ToLower()
+    if ($lc -notmatch '外壳服务对象' -and
+        $lc -notmatch 'shell service object' -and
+        $lc -notmatch 'shell extension') { return $directName }
   }
   return $fallback
 }
 function Format-DisplayName($name) {
   if (-not $name) { return $name }
   return $name.Trim()
+}
+# 预建 CommandStore 反向索引：ExplorerCommandHandler(CLSID) → 已解析的 MUIVerb
+# 仅扫描一次，供 Resolve-ExtName Level 1.7 使用
+$cmdStoreVerbs = @{}
+$cmdStorePath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\CommandStore\\shell'
+if (Test-Path -LiteralPath $cmdStorePath) {
+  Get-ChildItem -LiteralPath $cmdStorePath | ForEach-Object {
+    $handler = $_.GetValue('ExplorerCommandHandler')
+    if ($handler -match '^\\{[0-9A-Fa-f-]+\\}$' -and -not $cmdStoreVerbs.ContainsKey($handler)) {
+      $mv = $_.GetValue('MUIVerb')
+      if ($mv) {
+        if ($mv.StartsWith('@') -or $mv.StartsWith('ms-resource:')) {
+          try {
+            $r = [CmHelper]::ResolveIndirect($mv)
+            if ($r -and $r.Length -ge 2) { $cmdStoreVerbs[$handler] = $r }
+          } catch {}
+        } elseif ($mv.Length -ge 2) { $cmdStoreVerbs[$handler] = $mv }
+      }
+    }
+  }
 }
 $shellexPath = 'HKCR:\\${shellexSubPath}'
 if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }

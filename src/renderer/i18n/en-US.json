@@ -1,0 +1,190 @@
+{
+  "translation": {
+    "app": {
+      "name": "ContextMaster",
+      "title": "Windows Context Menu Manager",
+      "description": "Windows right-click menu management tool"
+    },
+    "nav": {
+      "menuScenes": "Menu Scenes",
+      "management": "Management",
+      "desktop": "Desktop Right-Click",
+      "file": "File Right-Click",
+      "folder": "Folder Right-Click",
+      "drive": "Drive Right-Click",
+      "directoryBackground": "Directory Background",
+      "recycleBin": "Recycle Bin Right-Click",
+      "history": "History",
+      "backup": "Backup Management",
+      "settings": "Settings"
+    },
+    "main": {
+      "search": "Global Search...",
+      "all": "All",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "items": "items",
+      "addItem": "Add Item",
+      "loading": "Loading...",
+      "loadFailed": "Load failed",
+      "noItems": "No items",
+      "selectItem": "Select Item",
+      "selectItemDesc": "Select an item from the left to view details",
+      "noItemSelected": "No item selected",
+      "operationFailed": "Operation failed",
+      "actionDone": "",
+      "callFailed": "Call failed",
+      "deleteDev": "Delete feature in development",
+      "searchResults": "Search Results",
+      "matchesFor": "matches for",
+      "noMatchFor": "No matches found for"
+    },
+    "item": {
+      "name": "Name",
+      "status": "Status",
+      "type": "Type",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "custom": "Custom",
+      "system": "System",
+      "shellExt": "Shell Extension",
+      "source": "Source Program",
+      "sourceUnknown": "Unknown Source",
+      "command": "Command",
+      "scene": "Scene",
+      "registryPath": "Registry Path",
+      "copyPath": "Copy Path",
+      "openInRegedit": "Open in Registry Editor",
+      "locateInRegedit": "Locate in Regedit",
+      "locateFailed": "Locate failed",
+      "comObject": "COM Object",
+      "commandSubkey": "Command Subkey Path"
+    },
+    "detail": {
+      "enableDisable": "Enable/Disable",
+      "edit": "Edit",
+      "delete": "Delete",
+      "disabledNote": "LegacyDisable key has been written to disable this item",
+      "disabledNoteShellExt": "Registry key has been prefixed with '-' to disable (Shell Extension mechanism)"
+    },
+    "history": {
+      "title": "Operation History",
+      "recent": "Recent Operations",
+      "clearAll": "Clear All",
+      "undo": "Undo",
+      "noRecords": "No operation records",
+      "undoFailed": "Undo failed",
+      "undoSuccess": "Undo successful",
+      "confirmClear": "Clear all operation records?",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "operation": {
+        "enable": "Enable",
+        "disable": "Disable",
+        "create": "Create",
+        "delete": "Delete",
+        "update": "Update",
+        "backup": "Backup",
+        "restore": "Restore"
+      }
+    },
+    "backup": {
+      "title": "Backup Management",
+      "import": "Import Backup",
+      "create": "Create Backup",
+      "auto": "Auto",
+      "manual": "Manual",
+      "warning": "Restoring backup will overwrite current config. It is recommended to create a snapshot first.",
+      "items": "items",
+      "fileSize": "file size",
+      "restore": "Restore",
+      "delete": "Delete",
+      "export": "Export",
+      "loadFailed": "Failed to load backups",
+      "noBackups": "No backups",
+      "enterNote": "Enter backup note:",
+      "manualBackup": "Manual Backup",
+      "createFailed": "Failed to create backup",
+      "backupCreated": "Backup created",
+      "previewFailed": "Failed to preview differences",
+      "willRestore": "Will restore backup",
+      "itemsWillChange": "{{count}} items will change state",
+      "autoSnapshot": "System will automatically create a snapshot of current state",
+      "confirmContinue": "Continue?",
+      "noDiff": "Backup",
+      "noNeedRestore": "is identical to current state, no need to restore",
+      "restoreFailed": "Restore failed",
+      "restored": "Backup restored",
+      "exportFailed": "Export failed",
+      "noFileSelected": "No file selected",
+      "importFailed": "Import failed",
+      "imported": "Backup imported",
+      "confirmDelete": "Delete this backup? This action cannot be undone.",
+      "deleteFailed": "Delete failed"
+    },
+    "settings": {
+      "title": "Settings",
+      "appearance": {
+        "title": "Appearance",
+        "theme": "Theme",
+        "themeSystem": "Follow System",
+        "themeLight": "Light",
+        "themeDark": "Dark",
+        "language": "Language"
+      },
+      "permission": {
+        "title": "Permission",
+        "admin": "Administrator Permission",
+        "adminGranted": "Administrator permission granted",
+        "adminNotGranted": "Not running as administrator",
+        "restartAsAdmin": "Restart as Administrator"
+      },
+      "backup": {
+        "title": "Backup & Security",
+        "autoBackup": "Auto Backup",
+        "autoBackupDesc": "Automatically create config snapshot before batch operations",
+        "confirmDanger": "Confirm Dangerous Operations",
+        "confirmDangerDesc": "Show confirmation dialog before deleting items"
+      },
+      "logs": {
+        "title": "Logs",
+        "logFiles": "Log Files",
+        "logDesc": "Logs are kept for the last 7 days, stored in the logs folder under app data directory",
+        "openLogDir": "Open Log Folder"
+      },
+      "about": {
+        "title": "About",
+        "version": "ContextMaster v1.0.0",
+        "description": "Windows context menu management tool, built with Electron + TypeScript",
+        "developer": "Developer",
+        "license": "License",
+        "mit": "MIT License · Open source and free, contributions welcome",
+        "source": "Source Code Repository"
+      }
+    },
+    "statusBar": {
+      "adminMode": "Administrator Mode",
+      "standardMode": "Standard Mode (Auto-elevate on operations)",
+      "currentScene": "Current Scene: ",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "common": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "save": "Save",
+      "close": "Close",
+      "search": "Search",
+      "loading": "Loading...",
+      "error": "Error",
+      "success": "Success",
+      "warning": "Warning"
+    },
+    "window": {
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "restore": "Restore",
+      "close": "Close"
+    }
+  }
+}

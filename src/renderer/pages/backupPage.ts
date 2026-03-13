@@ -1,13 +1,14 @@
 import '../api/bridge';
 import type { BackupSnapshot } from '../../shared/types';
 import { BackupType } from '../../shared/enums';
+import { t } from '../i18n';
 
 let backups: BackupSnapshot[] = [];
 
 export async function loadBackups(): Promise<void> {
   const result = await window.api.getBackups();
   if (!result.success) {
-    alert(`加载备份失败: ${result.error}`);
+    alert(`${t('backup.loadFailed')}: ${result.error}`);
     return;
   }
   backups = result.data;
@@ -21,7 +22,7 @@ export function renderBackup(): void {
   if (!backups.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">
       <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-      <div>暂无备份</div>
+      <div>${t('backup.noBackups')}</div>
     </div>`;
     return;
   }
@@ -43,18 +44,18 @@ export function renderBackup(): void {
           <div class="backup-date">${dateStr}</div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px;">SHA256: ${b.sha256Checksum.substring(0, 12)}…</div>
         </div>
-        <span class="tag" style="${tagStyle}">${isAuto ? '自动' : '手动'}</span>
+        <span class="tag" style="${tagStyle}">${isAuto ? t('backup.auto') : t('backup.manual')}</span>
       </div>
       <div class="backup-stats">
-        <div class="backup-stat"><strong>${items}</strong>条目数</div>
-        <div class="backup-stat"><strong>${sizeKb}KB</strong>文件大小</div>
+        <div class="backup-stat"><strong>${items}</strong>${t('backup.items')}</div>
+        <div class="backup-stat"><strong>${sizeKb}KB</strong>${t('backup.fileSize')}</div>
       </div>
       <div class="backup-actions">
         <button class="btn btn-secondary" style="flex:1;justify-content:center;font-size:12px;"
-          onclick="window._backupPage.restoreBackup(${b.id})">恢复</button>
+          onclick="window._backupPage.restoreBackup(${b.id})">${t('backup.restore')}</button>
         <button class="btn btn-secondary" style="flex:1;justify-content:center;font-size:12px;"
-          onclick="window._backupPage.exportBackup(${b.id})">导出</button>
-        <button class="icon-btn danger" title="删除备份"
+          onclick="window._backupPage.exportBackup(${b.id})">${t('backup.export')}</button>
+        <button class="icon-btn danger" title="${t('backup.delete')}"
           onclick="window._backupPage.deleteBackup(${b.id})">
           <svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:currentColor;">
             <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
@@ -68,73 +69,72 @@ export function renderBackup(): void {
 
 export async function createBackup(): Promise<void> {
   const name = prompt(
-    '请输入备份备注：',
-    `手动备份 · ${new Date().toLocaleDateString('zh-CN')}`
+    t('backup.enterNote'),
+    `${t('backup.manualBackup')} · ${new Date().toLocaleDateString('zh-CN')}`
   );
   if (!name) return;
 
   const result = await window.api.createBackup(name);
   if (!result.success) {
-    alert(`创建备份失败: ${result.error}`);
+    alert(`${t('backup.createFailed')}: ${result.error}`);
     return;
   }
   backups.unshift(result.data);
   renderBackup();
   (window as Window & { showUndo?: (msg: string) => void })
-    .showUndo?.(`备份已创建: ${name}`);
+    .showUndo?.(`${t('backup.backupCreated')}: ${name}`);
 }
 
 export async function restoreBackup(id: number): Promise<void> {
   const b = backups.find((x) => x.id === id);
   if (!b) return;
 
-  // 先预览差异
   const diffResult = await window.api.previewRestoreDiff(id);
   if (!diffResult.success) {
-    alert(`预览差异失败: ${diffResult.error}`);
+    alert(`${t('backup.previewFailed')}: ${diffResult.error}`);
     return;
   }
   const diffCount = diffResult.data.length;
   const confirmMsg = diffCount > 0
-    ? `将恢复备份「${b.name}」\n共有 ${diffCount} 个条目状态将变更。\n系统将自动创建当前状态的快照。\n\n确定继续？`
-    : `备份「${b.name}」与当前状态无差异，无需恢复。`;
+    ? `${t('backup.willRestore')}「${b.name}」\n${t('backup.itemsWillChange', { count: diffCount })}\n${t('backup.autoSnapshot')}\n\n${t('backup.confirmContinue')}`
+    : `${t('backup.noDiff')}「${b.name}」${t('backup.noNeedRestore')}`;
 
   if (diffCount === 0) { alert(confirmMsg); return; }
   if (!confirm(confirmMsg)) return;
 
   const result = await window.api.restoreBackup(id);
   if (!result.success) {
-    alert(`恢复失败: ${result.error}`);
+    alert(`${t('backup.restoreFailed')}: ${result.error}`);
     return;
   }
   await loadBackups();
   (window as Window & { showUndo?: (msg: string) => void })
-    .showUndo?.(`已恢复备份：${b.name}`);
+    .showUndo?.(`${t('backup.restored')}: ${b.name}`);
 }
 
 export async function exportBackup(id: number): Promise<void> {
   const result = await window.api.exportBackup(id);
   if (!result.success) {
-    alert(`导出失败: ${result.error}`);
+    alert(`${t('backup.exportFailed')}: ${result.error}`);
   }
 }
 
 export async function importBackup(): Promise<void> {
   const result = await window.api.importBackup();
   if (!result.success) {
-    if (result.error !== '未选择文件') alert(`导入失败: ${result.error}`);
+    if (result.error !== t('backup.noFileSelected')) alert(`${t('backup.importFailed')}: ${result.error}`);
     return;
   }
   backups.unshift(result.data);
   renderBackup();
   (window as Window & { showUndo?: (msg: string) => void })
-    .showUndo?.(`备份已导入: ${result.data.name}`);
+    .showUndo?.(`${t('backup.imported')}: ${result.data.name}`);
 }
 
 export async function deleteBackup(id: number): Promise<void> {
-  if (!confirm('确定删除这个备份？此操作不可撤销。')) return;
+  if (!confirm(t('backup.confirmDelete'))) return;
   const result = await window.api.deleteBackup(id);
-  if (!result.success) { alert(`删除失败: ${result.error}`); return; }
+  if (!result.success) { alert(`${t('backup.deleteFailed')}: ${result.error}`); return; }
   backups = backups.filter((b) => b.id !== id);
   renderBackup();
 }

@@ -1,16 +1,20 @@
 import '../api/bridge';
 import type { OperationRecord } from '../../shared/types';
 import { OperationType } from '../../shared/enums';
+import { t } from '../i18n';
 
-const OP_LABELS: Record<OperationType, string> = {
-  [OperationType.Enable]:  '启用',
-  [OperationType.Disable]: '禁用',
-  [OperationType.Create]:  '新增',
-  [OperationType.Delete]:  '删除',
-  [OperationType.Update]:  '修改',
-  [OperationType.Backup]:  '备份',
-  [OperationType.Restore]: '恢复',
-};
+function getOpLabel(type: OperationType): string {
+  const opKeys: Record<OperationType, string> = {
+    [OperationType.Enable]:  'history.operation.enable',
+    [OperationType.Disable]: 'history.operation.disable',
+    [OperationType.Create]:  'history.operation.create',
+    [OperationType.Delete]:  'history.operation.delete',
+    [OperationType.Update]:  'history.operation.update',
+    [OperationType.Backup]:  'history.operation.backup',
+    [OperationType.Restore]: 'history.operation.restore',
+  };
+  return t(opKeys[type] ?? type);
+}
 
 const OP_CSS_CLASS: Record<OperationType, string> = {
   [OperationType.Enable]:  'enable',
@@ -27,11 +31,11 @@ let filterType: string = 'all';
 
 export async function loadHistory(): Promise<void> {
   const listEl = document.getElementById('historyList');
-  if (listEl) listEl.innerHTML = `<div class="empty-state"><div>加载中…</div></div>`;
+  if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;
 
   const result = await window.api.getHistory();
   if (!result.success) {
-    if (listEl) listEl.innerHTML = `<div class="empty-state" style="color:var(--danger);">加载失败: ${result.error}</div>`;
+    if (listEl) listEl.innerHTML = `<div class="empty-state" style="color:var(--danger);">${t('main.loadFailed')}: ${result.error}</div>`;
     return;
   }
 
@@ -52,13 +56,13 @@ export function renderHistory(filter?: string): void {
   if (!data.length) {
     listEl.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-      <div>暂无操作记录</div>
+      <div>${t('history.noRecords')}</div>
     </div>`;
     return;
   }
 
   listEl.innerHTML = data.map((h) => {
-    const label = OP_LABELS[h.operationType] ?? h.operationType;
+    const label = getOpLabel(h.operationType);
     const cssClass = OP_CSS_CLASS[h.operationType] ?? 'add';
     const timeStr = formatTime(h.timestamp);
     const canUndo =
@@ -73,7 +77,7 @@ export function renderHistory(filter?: string): void {
         <div class="h-detail">${label} · ${escapeHtml(h.registryPath)}</div>
       </div>
       <div class="h-time">${timeStr}</div>
-      ${canUndo ? `<button class="h-undo" onclick="window._historyPage.undoRecord(${h.id})">撤销</button>` : ''}
+      ${canUndo ? `<button class="h-undo" onclick="window._historyPage.undoRecord(${h.id})">${t('history.undo')}</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -81,16 +85,16 @@ export function renderHistory(filter?: string): void {
 export async function undoRecord(id: number): Promise<void> {
   const result = await window.api.undoOperation(id);
   if (!result.success) {
-    alert(`撤销失败: ${result.error}`);
+    alert(`${t('history.undoFailed')}: ${result.error}`);
     return;
   }
   await loadHistory();
   (window as Window & { showUndo?: (msg: string) => void })
-    .showUndo?.('撤销成功');
+    .showUndo?.(t('history.undoSuccess'));
 }
 
 export async function clearAllHistory(): Promise<void> {
-  if (!confirm('确定清除所有操作记录？')) return;
+  if (!confirm(t('history.confirmClear'))) return;
   await window.api.clearHistory();
   allRecords = [];
   renderHistory();
@@ -109,8 +113,8 @@ function formatTime(iso: string): string {
     const diffMs = now.getTime() - d.getTime();
     const diffDays = Math.floor(diffMs / 86400000);
     const timeStr = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    if (diffDays === 0) return `今天 ${timeStr}`;
-    if (diffDays === 1) return `昨天 ${timeStr}`;
+    if (diffDays === 0) return `${t('history.today')} ${timeStr}`;
+    if (diffDays === 1) return `${t('history.yesterday')} ${timeStr}`;
     return d.toLocaleDateString('zh-CN') + ' ' + timeStr;
   } catch {
     return iso;

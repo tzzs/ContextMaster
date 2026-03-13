@@ -203,13 +203,13 @@
   <span class="titlebar-title">ContextMaster</span>
   <div class="titlebar-spacer"></div>
   <div class="titlebar-btns">
-    <button class="titlebar-btn" title="最小化" onclick="window.api.minimizeWindow()">
+    <button class="titlebar-btn" data-i18n-title="window.minimize" title="最小化" onclick="window.api.minimizeWindow()">
       <svg viewBox="0 0 10 1"><rect width="10" height="1"/></svg>
     </button>
-    <button class="titlebar-btn" id="winMaximize" title="最大化" onclick="window.api.maximizeWindow().then(()=>window.updateMaximizeBtn())">
+    <button class="titlebar-btn" id="winMaximize" data-i18n-title="window.maximize" title="最大化" onclick="window.api.maximizeWindow().then(()=>window.updateMaximizeBtn())">
       <svg viewBox="0 0 10 10"><path d="M0 0v10h10V0H0zm1 1h8v8H1V1z"/></svg>
     </button>
-    <button class="titlebar-btn close" title="关闭" onclick="window.api.closeWindow()">
+    <button class="titlebar-btn close" data-i18n-title="window.close" title="关闭" onclick="window.api.closeWindow()">
       <svg viewBox="0 0 10 10"><path d="M1 0L0 1l4 4-4 4 1 1 4-4 4 4 1-1-4-4 4-4-1-1-4 4-4-4z"/></svg>
     </button>
   </div>
@@ -221,53 +221,53 @@
   <nav class="nav">
     <div class="global-search-wrap">
       <svg viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zM6.5 11a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-      <input class="global-search" id="globalSearch" type="text" placeholder="全局搜索...">
+      <input class="global-search" id="globalSearch" type="text" data-i18n-placeholder="main.search" placeholder="全局搜索...">
     </div>
-    <div class="nav-section-label">菜单场景</div>
+    <div class="nav-section-label" data-i18n="nav.menuScenes">菜单场景</div>
     <div class="nav-item active" data-scene="Desktop" onclick="switchPage('main', this, 'Desktop')">
       <svg viewBox="0 0 16 16"><path d="M0 3.5A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v8A1.5 1.5 0 0 1 14.5 13H9v1.5H12a.5.5 0 0 1 0 1H4a.5.5 0 0 1 0-1H7V13H1.5A1.5 1.5 0 0 1 0 11.5v-8zM1.5 3a.5.5 0 0 0-.5.5V11h14V3.5a.5.5 0 0 0-.5-.5h-13z"/></svg>
-      桌面右键
+      <span data-i18n="nav.desktop">桌面右键</span>
       <span class="nav-badge" id="badge-Desktop">—</span>
     </div>
     <div class="nav-item" data-scene="File" onclick="switchPage('main', this, 'File')">
       <svg viewBox="0 0 16 16"><path d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zm5.5 1.5v2a1 1 0 0 0 1 1h2L9.5 1.5z"/></svg>
-      文件右键
+      <span data-i18n="nav.file">文件右键</span>
       <span class="nav-badge" id="badge-File">—</span>
     </div>
     <div class="nav-item" data-scene="Folder" onclick="switchPage('main', this, 'Folder')">
       <svg viewBox="0 0 16 16"><path d="M.54 3.87L.5 3a2 2 0 0 1 2-2h3.19a2 2 0 0 1 1.345.51l.41.38H14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-1.72L.54 3.87z"/></svg>
-      文件夹右键
+      <span data-i18n="nav.folder">文件夹右键</span>
       <span class="nav-badge" id="badge-Folder">—</span>
     </div>
     <div class="nav-item" data-scene="Drive" onclick="switchPage('main', this, 'Drive')">
       <svg viewBox="0 0 16 16"><path d="M1 8a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 0 1h-13A.5.5 0 0 1 1 8zM1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3z"/></svg>
-      驱动器右键
+      <span data-i18n="nav.drive">驱动器右键</span>
       <span class="nav-badge" id="badge-Drive">—</span>
     </div>
     <div class="nav-item" data-scene="DirectoryBackground" onclick="switchPage('main', this, 'DirectoryBackground')">
       <svg viewBox="0 0 16 16"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/></svg>
-      目录背景
+      <span data-i18n="nav.directoryBackground">目录背景</span>
       <span class="nav-badge" id="badge-DirectoryBackground">—</span>
     </div>
     <div class="nav-item" data-scene="RecycleBin" onclick="switchPage('main', this, 'RecycleBin')">
       <svg viewBox="0 0 16 16"><path d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5zm-5 0v1h4v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5z"/></svg>
-      回收站右键
+      <span data-i18n="nav.recycleBin">回收站右键</span>
       <span class="nav-badge" id="badge-RecycleBin">—</span>
     </div>
 
     <div class="nav-divider"></div>
-    <div class="nav-section-label">管理</div>
+    <div class="nav-section-label" data-i18n="nav.management">管理</div>
     <div class="nav-item" onclick="switchPage('history', this)">
       <svg viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
-      操作记录
+      <span data-i18n="nav.history">操作记录</span>
     </div>
     <div class="nav-item" onclick="switchPage('backup', this)">
       <svg viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-      备份管理
+      <span data-i18n="nav.backup">备份管理</span>
     </div>
     <div class="nav-item" onclick="switchPage('settings', this)">
       <svg viewBox="0 0 16 16"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.892 3.433-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.892-1.64-.901-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/></svg>
-      设置
+      <span data-i18n="nav.settings">设置</span>
     </div>
 
   </nav>
@@ -281,13 +281,13 @@
         <span class="toolbar-title" id="sceneTitle">桌面右键 <span>— 个条目</span></span>
         <div class="toolbar-spacer"></div>
         <div class="segmented">
-          <button class="seg-btn active" onclick="window._mainPage.setFilter('all', this)">全部</button>
-          <button class="seg-btn" onclick="window._mainPage.setFilter('enabled', this)">已启用</button>
-          <button class="seg-btn" onclick="window._mainPage.setFilter('disabled', this)">已禁用</button>
+          <button class="seg-btn active" data-i18n="main.all" onclick="window._mainPage.setFilter('all', this)">全部</button>
+          <button class="seg-btn" data-i18n="main.enabled" onclick="window._mainPage.setFilter('enabled', this)">已启用</button>
+          <button class="seg-btn" data-i18n="main.disabled" onclick="window._mainPage.setFilter('disabled', this)">已禁用</button>
         </div>
         <button class="btn btn-primary" onclick="alert('新增条目功能开发中')">
           <svg viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
-          新增条目
+          <span data-i18n="main.addItem">新增条目</span>
         </button>
       </div>
 
@@ -301,23 +301,23 @@
         <!-- DETAIL PANEL -->
         <div class="detail-panel" id="detailPanel">
           <div class="detail-header">
-            <div class="detail-title" id="detailName">选择条目</div>
-            <div class="detail-sub" id="detailSub">在左侧选择一个条目查看详情</div>
+            <div class="detail-title" id="detailName" data-i18n="main.selectItem">选择条目</div>
+            <div class="detail-sub" id="detailSub" data-i18n="main.selectItemDesc">在左侧选择一个条目查看详情</div>
           </div>
           <div class="detail-body" id="detailBody">
             <div class="empty-state" style="height:160px;">
               <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-              <div style="font-size:12px;">未选中任何条目</div>
+              <div style="font-size:12px;" data-i18n="main.noItemSelected">未选中任何条目</div>
             </div>
           </div>
           <div class="detail-actions" id="detailActions" style="display:none;">
             <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="window._mainPage.toggleFromDetail()">
               <svg viewBox="0 0 16 16" style="width:13px;height:13px;fill:currentColor;"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg>
-              启用/禁用
+              <span data-i18n="detail.enableDisable">启用/禁用</span>
             </button>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="alert('编辑功能开发中')">编辑</button>
-              <button class="btn btn-danger" style="flex:1;justify-content:center;" onclick="window._mainPage.deleteSelected()">删除</button>
+              <button class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="alert('编辑功能开发中')" data-i18n="detail.edit">编辑</button>
+              <button class="btn btn-danger" style="flex:1;justify-content:center;" onclick="window._mainPage.deleteSelected()" data-i18n="detail.delete">删除</button>
             </div>
           </div>
         </div>
@@ -327,15 +327,15 @@
     <!-- PAGE: HISTORY -->
     <div class="page" id="page-history">
       <div class="toolbar">
-        <span class="toolbar-title">操作记录 <span>最近操作</span></span>
+        <span class="toolbar-title" data-i18n="history.title">操作记录 <span data-i18n="history.recent">最近操作</span></span>
         <div class="toolbar-spacer"></div>
         <div style="display:flex;gap:6px;">
-          <span class="chip active" onclick="window._historyPage.filterHistory('all', this)">全部</span>
-          <span class="chip" onclick="window._historyPage.filterHistory('enable', this)">启用</span>
-          <span class="chip" onclick="window._historyPage.filterHistory('disable', this)">禁用</span>
-          <span class="chip" onclick="window._historyPage.filterHistory('delete', this)">删除</span>
+          <span class="chip active" onclick="window._historyPage.filterHistory('all', this)" data-i18n="main.all">全部</span>
+          <span class="chip" onclick="window._historyPage.filterHistory('enable', this)" data-i18n="history.operation.enable">启用</span>
+          <span class="chip" onclick="window._historyPage.filterHistory('disable', this)" data-i18n="history.operation.disable">禁用</span>
+          <span class="chip" onclick="window._historyPage.filterHistory('delete', this)" data-i18n="history.operation.delete">删除</span>
         </div>
-        <button class="btn btn-danger" onclick="window._historyPage.clearAllHistory()">清除全部</button>
+        <button class="btn btn-danger" onclick="window._historyPage.clearAllHistory()" data-i18n="history.clearAll">清除全部</button>
       </div>
       <div class="content">
         <div class="history-list" id="historyList">
@@ -347,21 +347,21 @@
     <!-- PAGE: BACKUP -->
     <div class="page" id="page-backup">
       <div class="toolbar">
-        <span class="toolbar-title">备份管理</span>
+        <span class="toolbar-title" data-i18n="backup.title">备份管理</span>
         <div class="toolbar-spacer"></div>
         <button class="btn btn-secondary" onclick="window._backupPage.importBackup()">
           <svg viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
-          导入备份
+          <span data-i18n="backup.import">导入备份</span>
         </button>
         <button class="btn btn-primary" onclick="window._backupPage.createBackup()">
           <svg viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
-          新建备份
+          <span data-i18n="backup.create">新建备份</span>
         </button>
       </div>
       <div class="content">
         <div style="background:var(--warning-bg);border:1px solid rgba(157,93,0,0.2);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--warning);display:flex;align-items:center;gap:8px;">
           <svg viewBox="0 0 16 16" style="width:14px;height:14px;fill:currentColor;flex-shrink:0;"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
-          恢复备份会覆盖当前配置，建议先手动创建快照
+          <span data-i18n="backup.warning">恢复备份会覆盖当前配置，建议先手动创建快照</span>
         </div>
         <div class="backup-grid" id="backupGrid">
           <div class="empty-state" style="grid-column:1/-1;"><div>加载中…</div></div>
@@ -372,29 +372,60 @@
     <!-- PAGE: SETTINGS -->
     <div class="page" id="page-settings">
       <div class="toolbar">
-        <span class="toolbar-title">设置</span>
+        <span class="toolbar-title" data-i18n="settings.title">设置</span>
       </div>
       <div class="content">
         <div style="max-width:800px;">
+          <!-- 外观设置 -->
           <div class="settings-section">
-            <div class="settings-header">权限</div>
+            <div class="settings-header" data-i18n="settings.appearance.title">外观</div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">管理员权限</div>
+                <div class="setting-label" data-i18n="settings.appearance.theme">主题</div>
+                <div class="setting-desc">选择应用主题外观</div>
+              </div>
+              <div class="setting-control">
+                <select id="themeSelect" class="native-select" style="min-width: 140px;">
+                  <option value="system" data-i18n="settings.appearance.themeSystem">跟随系统</option>
+                  <option value="light" data-i18n="settings.appearance.themeLight">浅色</option>
+                  <option value="dark" data-i18n="settings.appearance.themeDark">深色</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label" data-i18n="settings.appearance.language">语言</div>
+                <div class="setting-desc">选择界面语言</div>
+              </div>
+              <div class="setting-control">
+                <select id="languageSelect" class="native-select" style="min-width: 140px;">
+                  <option value="zh-CN">中文</option>
+                  <option value="en-US">English</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 权限设置 -->
+          <div class="settings-section">
+            <div class="settings-header" data-i18n="settings.permission.title">权限</div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label" data-i18n="settings.permission.admin">管理员权限</div>
                 <div class="setting-desc" id="adminStatus">检查中…</div>
               </div>
               <div class="setting-control">
-                <button class="btn btn-secondary" onclick="window._settingsPage.requestAdminRestart()">以管理员重启</button>
+                <button class="btn btn-secondary" onclick="window._settingsPage.requestAdminRestart()" data-i18n="settings.permission.restartAsAdmin">以管理员重启</button>
               </div>
             </div>
           </div>
 
           <div class="settings-section">
-            <div class="settings-header">备份与安全</div>
+            <div class="settings-header" data-i18n="settings.backup.title">备份与安全</div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">自动备份</div>
-                <div class="setting-desc">批量操作前自动创建配置快照</div>
+                <div class="setting-label" data-i18n="settings.backup.autoBackup">自动备份</div>
+                <div class="setting-desc" data-i18n="settings.backup.autoBackupDesc">批量操作前自动创建配置快照</div>
               </div>
               <div class="setting-control">
                 <button class="toggle-switch on" onclick="window._settingsPage.toggleSwitch(this)"><div class="toggle-thumb"></div></button>
@@ -402,8 +433,8 @@
             </div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">高危操作二次确认</div>
-                <div class="setting-desc">删除条目等操作前弹出确认对话框</div>
+                <div class="setting-label" data-i18n="settings.backup.confirmDanger">高危操作二次确认</div>
+                <div class="setting-desc" data-i18n="settings.backup.confirmDangerDesc">删除条目等操作前弹出确认对话框</div>
               </div>
               <div class="setting-control">
                 <button class="toggle-switch on" onclick="window._settingsPage.toggleSwitch(this)"><div class="toggle-thumb"></div></button>
@@ -412,41 +443,41 @@
           </div>
 
           <div class="settings-section">
-            <div class="settings-header">日志</div>
+            <div class="settings-header" data-i18n="settings.logs.title">日志</div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">日志文件</div>
-                <div class="setting-desc">运行日志保留最近 7 天，存储于应用数据目录下的 logs 文件夹</div>
+                <div class="setting-label" data-i18n="settings.logs.logFiles">日志文件</div>
+                <div class="setting-desc" data-i18n="settings.logs.logDesc">运行日志保留最近 7 天，存储于应用数据目录下的 logs 文件夹</div>
               </div>
               <div class="setting-control">
-                <button class="btn btn-secondary" onclick="window.openLogDir()">打开日志文件夹</button>
+                <button class="btn btn-secondary" onclick="window.openLogDir()" data-i18n="settings.logs.openLogDir">打开日志文件夹</button>
               </div>
             </div>
           </div>
 
           <div class="settings-section">
-            <div class="settings-header">关于</div>
+            <div class="settings-header" data-i18n="settings.about.title">关于</div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">ContextMaster v1.0.0</div>
-                <div class="setting-desc">Windows 右键菜单管理工具，基于 Electron + TypeScript 构建</div>
+                <div class="setting-label" data-i18n="settings.about.version">ContextMaster v1.0.0</div>
+                <div class="setting-desc" data-i18n="settings.about.description">Windows 右键菜单管理工具，基于 Electron + TypeScript 构建</div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">开发者</div>
+                <div class="setting-label" data-i18n="settings.about.developer">开发者</div>
                 <div class="setting-desc">tanzz</div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">开源协议</div>
-                <div class="setting-desc">MIT License · 开源免费，欢迎贡献</div>
+                <div class="setting-label" data-i18n="settings.about.license">开源协议</div>
+                <div class="setting-desc" data-i18n="settings.about.mit">MIT License · 开源免费，欢迎贡献</div>
               </div>
             </div>
             <div class="setting-row">
               <div class="setting-info">
-                <div class="setting-label">源码仓库</div>
+                <div class="setting-label" data-i18n="settings.about.source">源码仓库</div>
                 <div class="setting-desc">
                   <a href="#" style="color:var(--accent);text-decoration:none;"
                      onclick="event.preventDefault();window.api.openExternal('https://github.com/tzzs/ContextMaster')">
@@ -480,7 +511,7 @@
 <!-- UNDO BAR -->
 <div class="undo-bar" id="undoBar">
   <span id="undoMsg">操作已完成</span>
-  <button class="undo-btn" onclick="window.doUndo()">撤销</button>
+  <button class="undo-btn" onclick="window.doUndo()" data-i18n="history.undo">撤销</button>
   <button class="undo-close" onclick="window.hideUndo()">✕</button>
 </div>
 

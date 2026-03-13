@@ -1,0 +1,122 @@
+/* Theme CSS Variables */
+
+/* Light Theme (Default) */
+:root {
+  /* Primary Colors */
+  --accent: #0067C0;
+  --accent-light: #0078D4;
+  --accent-hover: #005A9E;
+  --accent-bg: #EFF6FC;
+
+  /* Status Colors */
+  --success: #0F7B0F;
+  --success-bg: #DFF6DD;
+  --danger: #C42B1C;
+  --danger-bg: #FDE7E9;
+  --warning: #9D5D00;
+  --warning-bg: #FFF4CE;
+
+  /* Background Colors */
+  --bg: #F3F3F3;
+  --surface: #FFFFFF;
+  --surface2: #F9F9F9;
+
+  /* Border & Text */
+  --border: #E0E0E0;
+  --border2: #EBEBEB;
+  --text: #1A1A1A;
+  --text2: #616161;
+  --text3: #8A8A8A;
+
+  /* Layout */
+  --nav-w: 220px;
+  --radius: 8px;
+  --radius-sm: 4px;
+
+  /* Shadows */
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  /* Primary Colors */
+  --accent: #4CA3F5;
+  --accent-light: #5CB3FF;
+  --accent-hover: #3A93E5;
+  --accent-bg: #1A3A5C;
+
+  /* Status Colors */
+  --success: #5CB85C;
+  --success-bg: #1E3A1E;
+  --danger: #E74C3C;
+  --danger-bg: #3A1A1A;
+  --warning: #F0AD4E;
+  --warning-bg: #3A3010;
+
+  /* Background Colors */
+  --bg: #1E1E1E;
+  --surface: #2D2D2D;
+  --surface2: #3A3A3A;
+
+  /* Border & Text */
+  --border: #404040;
+  --border2: #505050;
+  --text: #E0E0E0;
+  --text2: #B0B0B0;
+  --text3: #808080;
+
+  /* Shadows - darker for dark theme */
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* Additional Dark Theme Overrides */
+[data-theme="dark"] .titlebar {
+  background: rgba(30, 30, 30, 0.85);
+}
+
+[data-theme="dark"] .nav {
+  background: rgba(45, 45, 45, 0.8);
+}
+
+[data-theme="dark"] .toolbar {
+  background: rgba(30, 30, 30, 0.9);
+}
+
+[data-theme="dark"] .item-card {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .detail-panel {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .settings-section {
+  background: var(--surface);
+}
+
+/* Scrollbar dark theme */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+}
+
+/* Ensure proper contrast for all text */
+[data-theme="dark"] .empty-state svg {
+  fill: var(--border);
+}
+
+/* Button hover states for dark theme */
+[data-theme="dark"] .btn-secondary:hover {
+  background: var(--surface2);
+}
+
+[data-theme="dark"] .icon-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Selection color */
+[data-theme="dark"] ::selection {
+  background: var(--accent);
+  color: white;
+}

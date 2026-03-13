@@ -192,6 +192,67 @@ describe('RegistryService', () => {
     });
   });
 
+  describe('dllPath 字段透传', () => {
+    it('ShellExt 条目应将 dllPath 传入 MenuItemEntry', async () => {
+      const shellextItems = [{
+        name: 'gvim Shell Extension',
+        command: '{51EEE242-AD87-11d3-9C1E-0090278BBD99}',
+        iconPath: null,
+        isEnabled: true,
+        source: 'gvim',
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\gvim',
+        subKeyName: 'gvim',
+        itemType: 'ShellExt',
+        dllPath: 'C:\\Program Files\\Vim\\vim91\\gvimext.dll',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].dllPath).toBe('C:\\Program Files\\Vim\\vim91\\gvimext.dll');
+    });
+
+    it('无 DLL 路径的 ShellExt 条目 dllPath 应为 null', async () => {
+      const shellextItems = [{
+        name: 'SomeExt',
+        command: '{12345678-1234-1234-1234-123456789ABC}',
+        iconPath: null,
+        isEnabled: true,
+        source: 'SomeExt',
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\SomeExt',
+        subKeyName: 'SomeExt',
+        itemType: 'ShellExt',
+        dllPath: null,
+      }];
+
+      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].dllPath).toBeNull();
+    });
+
+    it('Classic Shell 条目 dllPath 应为 null', async () => {
+      const rawItems = [{
+        name: 'Classic Item',
+        command: 'cmd.exe',
+        iconPath: null,
+        isEnabled: true,
+        source: '',
+        registryKey: 'DesktopBackground\\Shell\\Classic',
+        subKeyName: 'Classic',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result[0].dllPath).toBeNull();
+    });
+  });
+
   describe('transaction management', () => {
     it('should create rollback point correctly', () => {
       const items = [

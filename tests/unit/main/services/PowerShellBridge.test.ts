@@ -187,6 +187,32 @@ describe('PowerShellBridge', () => {
       expect(script).toContain('FriendlyTypeName');
     });
 
+    it('应包含 Level 1.5 MUIVerb 解析，位于 LocalizedString 与 CLSID Default 之间', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('MUIVerb');
+      expect(script).toContain('Level 1.5: MUIVerb');
+
+      const localizedIdx = script.indexOf('LocalizedString');
+      const muiVerbIdx   = script.indexOf('Level 1.5: MUIVerb');
+      const level2Idx    = script.indexOf('Level 2: CLSID 默认值');
+
+      expect(muiVerbIdx).toBeGreaterThan(localizedIdx);
+      expect(level2Idx).toBeGreaterThan(muiVerbIdx);
+    });
+
+    it('应读取 InprocServer32 DLL 路径并输出 dllPath 字段', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('InprocServer32');
+      expect(script).toContain('ExpandEnvironmentVariables');
+      expect(script).toContain('dllPath');
+    });
+
     it('应包含友好名称映射表', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'

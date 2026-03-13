@@ -11,12 +11,14 @@
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
-      "@main/*": ["src/main/*"]
+      "@main/*": ["src/main/*"],
+      "@renderer/*": ["src/renderer/*"],
+      "@preload/*": ["src/preload/*"]
     },
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", ".vite"]
+  "exclude": ["node_modules", ".vite", "dist", "tests"]
 }

@@ -33,6 +33,7 @@ export interface WindowApi {
   restartAsAdmin(): Promise<IpcResult<boolean>>;
   openRegedit(fullRegPath: string): Promise<IpcResult<boolean>>;
   copyToClipboard(text: string): Promise<IpcResult<boolean>>;
+  openLogDir(): Promise<IpcResult<boolean>>;
 
   minimizeWindow(): Promise<void>;
   maximizeWindow(): Promise<void>;

@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, clipboard, shell, app } from 'electron';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { IPC } from '../../shared/ipc-channels';
 import { isAdmin, restartAsAdmin } from '../utils/AdminHelper';
@@ -55,7 +55,7 @@ export function registerSystemHandlers(): void {
       // 通过 cmd /c start 启动 regedit
       // 直接 execFile('regedit.exe') 在管理员上下文会报 EACCES，需借道 cmd
       log.info('[Regedit] 启动 regedit.exe (via cmd)');
-      const child = execFile('cmd.exe', ['/c', 'start', '', 'regedit.exe'], { detached: true });
+      const child = spawn('cmd.exe', ['/c', 'start', '', 'regedit.exe'], { detached: true, stdio: 'ignore' });
       child.on('error', (err) => log.error('[Regedit] regedit.exe 启动失败:', err));
       child.unref();
 
@@ -97,7 +97,7 @@ export function registerSystemHandlers(): void {
   ipcMain.handle(IPC.WIN_MAXIMIZE, (_event) => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) return;
-    win.isMaximized() ? win.unmaximize() : win.maximize();
+    if (win.isMaximized()) { win.unmaximize(); } else { win.maximize(); }
   });
 
   ipcMain.handle(IPC.WIN_CLOSE, (_event) => {

@@ -6,7 +6,6 @@ export function initLogger(): void {
   log.transports.file.resolvePathFn = () =>
     path.join(app.getPath('userData'), 'logs', 'main.log');
   log.transports.file.level = 'info';
-  log.transports.file.maxDays = 7;
   log.transports.console.level = 'debug';
 }
 

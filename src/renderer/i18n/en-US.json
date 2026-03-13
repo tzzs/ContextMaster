@@ -127,10 +127,12 @@
       "appearance": {
         "title": "Appearance",
         "theme": "Theme",
+        "themeDesc": "Select application theme appearance",
         "themeSystem": "Follow System",
         "themeLight": "Light",
         "themeDark": "Dark",
-        "language": "Language"
+        "language": "Language",
+        "languageDesc": "Select interface language"
       },
       "permission": {
         "title": "Permission",

@@ -1,5 +1,5 @@
 import '../api/bridge';
-import { changeLanguage, getCurrentLanguage, type SupportedLanguage } from '../i18n';
+import { t, changeLanguage, getCurrentLanguage, registerRefreshCallback, type SupportedLanguage } from '../i18n';
 import { getThemeManager, type ThemeMode } from '../utils/themeManager';
 import { getSettingsStore } from '../utils/settingsStore';
 
@@ -15,14 +15,16 @@ async function updateAdminStatus(): Promise<void> {
   const adminStatus = document.getElementById('adminStatus');
   if (adminStatus) {
     if (adminResult.success && adminResult.data) {
-      adminStatus.textContent = '已获取管理员权限';
+      adminStatus.textContent = t('settings.permission.adminGranted');
       adminStatus.style.color = 'var(--success)';
     } else {
-      adminStatus.textContent = '未以管理员身份运行';
+      adminStatus.textContent = t('settings.permission.adminNotGranted');
       adminStatus.style.color = 'var(--danger)';
     }
   }
 }
+
+registerRefreshCallback(updateAdminStatus);
 
 function initAppearanceSettings(): void {
   const themeSelect = document.getElementById('themeSelect') as HTMLSelectElement | null;
@@ -61,25 +63,21 @@ function initAppearanceSettings(): void {
   }
 }
 
-// 以管理员身份重启
 export async function requestAdminRestart(): Promise<void> {
   if (!confirm('确定要以管理员身份重启应用吗？')) return;
   await window.api.restartAsAdmin();
 }
 
-// 切换开关状态
 export function toggleSwitch(btn: HTMLElement): void {
   btn.classList.toggle('on');
   btn.classList.toggle('off');
 }
 
-// 打开日志目录
 export async function openLogDir(): Promise<void> {
   const result = await window.api.openLogDir();
   if (!result.success) alert(`打开日志目录失败: ${result.error}`);
 }
 
-// 导出 API 供 HTML 调用
 const settingsPageApi = { 
   requestAdminRestart, 
   toggleSwitch, 

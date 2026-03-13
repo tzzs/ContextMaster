@@ -98,6 +98,23 @@ export function registerSystemHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC.SYS_LOG_TO_FILE,
+    wrapHandler((_event: unknown, level: 'info' | 'warn' | 'error', message: string) => {
+      const prefix = '[Renderer]';
+      switch (level) {
+        case 'error':
+          log.error(prefix, message);
+          break;
+        case 'warn':
+          log.warn(prefix, message);
+          break;
+        default:
+          log.info(prefix, message);
+      }
+    })
+  );
+
+  ipcMain.handle(
     IPC.WIN_MINIMIZE,
     wrapHandler(() => {
       const win = BrowserWindow.getFocusedWindow();

@@ -2,6 +2,7 @@ import '../api/bridge';
 import { t, changeLanguage, getCurrentLanguage, registerRefreshCallback, type SupportedLanguage } from '../i18n';
 import { getThemeManager, type ThemeMode } from '../utils/themeManager';
 import { getSettingsStore } from '../utils/settingsStore';
+import { debug } from '../utils/debug';
 
 let isSettingsInitialized = false;
 
@@ -35,7 +36,7 @@ function initAppearanceSettings(): void {
     
     themeSelect.onchange = () => {
       const mode = themeSelect.value as ThemeMode;
-      console.log('主题切换到:', mode);
+      debug.log('主题切换到:', mode);
       themeManager.setTheme(mode);
       getSettingsStore().setSetting('theme', mode);
       
@@ -49,14 +50,14 @@ function initAppearanceSettings(): void {
     
     languageSelect.onchange = () => {
       const lang = languageSelect.value as SupportedLanguage;
-      console.log('语言切换到:', lang);
+      debug.log('语言切换到:', lang);
       
       getSettingsStore().setSetting('language', lang);
       
       changeLanguage(lang).then(() => {
-        console.log('语言切换成功');
+        debug.log('语言切换成功');
       }).catch((error) => {
-        console.error('语言切换失败:', error);
+        debug.error('语言切换失败:', error);
         alert('语言切换失败，请重试');
       });
     };

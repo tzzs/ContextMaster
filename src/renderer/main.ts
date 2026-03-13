@@ -85,8 +85,6 @@ let currentPage: PageId = 'main';
 let currentScene: MenuScene = MenuScene.Desktop;
 
 async function switchPage(page: PageId, navEl?: HTMLElement, scene?: MenuScene): Promise<void> {
-  // 切换场景时清空搜索状态
-  allScenesCache = null;
   const searchEl = document.getElementById('globalSearch') as HTMLInputElement | null;
   if (searchEl) searchEl.value = '';
 
@@ -137,6 +135,10 @@ function refreshMainContent(): void {
   checkAdminStatus();
 }
 
+function invalidateAllScenesCache(): void {
+  allScenesCache = null;
+}
+
 // ── 暴露给 HTML inline onclick ──
 Object.assign(window, {
   showUndo,
@@ -144,6 +146,7 @@ Object.assign(window, {
   doUndo,
   switchPage,
   updateMaximizeBtn,
+  invalidateAllScenesCache,
   // History
   filterHistory: (mode: string, btn: HTMLElement) => filterHistory(mode, btn),
   clearHistory: clearAllHistory,

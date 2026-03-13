@@ -175,8 +175,9 @@ export async function toggleItem(id: number): Promise<void> {
   }
   renderItems();
   const action = item.isEnabled ? t('history.operation.enable') : t('history.operation.disable');
-  (window as Window & { showUndo?: (msg: string, itemId: number) => void })
+  (window as Window & { showUndo?: (msg: string, itemId: number) => void; invalidateAllScenesCache?: () => void })
     .showUndo?.(`${t('main.actionDone')}${action}「${item.name}」`, id);
+  (window as Window & { invalidateAllScenesCache?: () => void }).invalidateAllScenesCache?.();
 
   updateStatusBarFromCurrent();
   if (selectedItemId === id) showDetail(id);
@@ -424,17 +425,17 @@ export function restoreSceneTitle(scene: MenuScene): void {
 // ── 预加载其余场景的 badge 数量 ──
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
   const allScenes = Object.values(MenuScene) as MenuScene[];
-  for (const scene of allScenes) {
-    if (scene === skipScene) continue;
-    const result = await window.api.getMenuItems(scene);
-    if (result.success) {
+  const scenesToLoad = allScenes.filter((s) => s !== skipScene);
+  
+  await Promise.all(
+    scenesToLoad.map(async (scene) => {
+      const result = await window.api.getMenuItems(scene);
       const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) badgeEl.textContent = String(result.data.length);
-    } else {
-      const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) badgeEl.textContent = '?';
-    }
-  }
+      if (badgeEl) {
+        badgeEl.textContent = result.success ? String(result.data.length) : '?';
+      }
+    })
+  );
 }
 
 // 挂载到 window 供 HTML inline onclick 调用

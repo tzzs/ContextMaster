@@ -213,13 +213,55 @@ describe('PowerShellBridge', () => {
       expect(script).toContain('dllPath');
     });
 
-    it('应包含友好名称映射表', () => {
+    it('不应包含硬编码 friendlyNames 映射表（已移除，让 SHLoadIndirectString 自动本地化）', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
-      expect(script).toContain('friendlyNames');
-      expect(script).toContain('Windows Defender');
+      expect(script).not.toContain('$friendlyNames');
+      expect(script).not.toContain('friendlyNames.ContainsKey');
+    });
+
+    it('Resolve-ExtName 应支持可选 $directName 参数作为 Level 0', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('$directName = $null');
+      expect(script).toContain('Level 0: handler key');
+      // Level 0 的位置应在 Level 1 LocalizedString 之前
+      const level0Idx = script.indexOf('Level 0: handler key');
+      const level1Idx = script.indexOf('Level 1: LocalizedString');
+      expect(level0Idx).toBeGreaterThan(0);
+      expect(level1Idx).toBeGreaterThan(level0Idx);
+    });
+
+    it('CmHelper.ResolveIndirect 应支持 ms-resource: 前缀', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('ms-resource:');
+      expect(script).toContain('!s.StartsWith("ms-resource:")');
+    });
+
+    it('LocalizedString 和 MUIVerb 应同时检查 @ 和 ms-resource: 前缀', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toMatch(/StartsWith\('@'\)\s*-or\s*\$\w+\.StartsWith\('ms-resource:'\)/);
+    });
+
+    it('ForEach 循环应使用 $actualClsid 分离 CLSID 与 Default 值', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('$actualClsid');
+      expect(script).toContain('$defaultVal');
+      // command 字段应使用 $actualClsid，而非旧的 $clsid
+      expect(script).toContain('command     = [string]$actualClsid');
     });
   });
 

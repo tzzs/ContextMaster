@@ -237,7 +237,8 @@ public class CmHelper {
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
     static extern int SHLoadIndirectString(string s, StringBuilder buf, int cap, IntPtr r);
     public static string ResolveIndirect(string s) {
-        if (string.IsNullOrEmpty(s) || !s.StartsWith("@")) return null;
+        if (string.IsNullOrEmpty(s) ||
+            (!s.StartsWith("@") && !s.StartsWith("ms-resource:"))) return null;
         var sb = new StringBuilder(512);
         return SHLoadIndirectString(s, sb, 512, IntPtr.Zero) == 0 ? sb.ToString() : null;
     }
@@ -252,28 +253,21 @@ public class CmHelper {
     try { Add-Type -TypeDefinition $src -ErrorAction Stop; $helperLoaded = $true } catch {}
   }
 }
-# 常见 Shell 扩展友好名称映射表
-$friendlyNames = @{
-  '{90AA3A4E-1CBA-4233-B8BB-535773D48449}' = 'Windows Defender'
-  '{09A47860-11B0-4DA5-AFA5-26D86198A780}' = 'Windows Defender'
-  '{D969A300-E7FF-11d0-A93B-00A0C90F2719}' = '发送到'
-  '{C2FBB630-2971-11D1-A18C-00C04FD75D13}' = '复制到文件夹'
-  '{C2FBB631-2971-11D1-A18C-00C04FD75D13}' = '移动到文件夹'
-  '{B4FB3F98-C1EA-428d-A78A-D1F5659CBA93}' = 'Windows Media Player'
-  '{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}' = 'Windows 传真和扫描'
-  '{E57CBC10-2D49-4B66-B1AA-74F08D5B8A01}' = 'Windows PowerShell'
-  '{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}' = 'Windows 搜索'
-  '{F978C3D4-6F3D-4360-99F1-5F3C7A2C8C0D}' = 'OneDrive'
-  '{A0396A93-DC06-4AEF-BEAF-9A8F65E1D6C0}' = 'OneDrive'
-  '{8AB3A2F0-EF1C-4E99-8E6A-0D6E0B88C5A5}' = 'OneDrive'
-  '{3C8A3F87-34FB-4A3B-8B5A-6F5E3C8D9A2B}' = 'Visual Studio'
-  '{9F6C8B1E-3D4A-4C9F-B5E2-7A8D9C0F1E3B}' = 'Git'
-  '{A8B9C0D1-E2F3-4A5B-6C7D-8E9F0A1B2C3D}' = '7-Zip'
-}
-function Resolve-ExtName($clsid, $fallback) {
-  # Level 0: 友好名称映射表
-  if ($friendlyNames.ContainsKey($clsid)) {
-    return $friendlyNames[$clsid]
+function Resolve-ExtName($clsid, $fallback, $directName = $null) {
+  # Level 0: handler key 的非 CLSID Default 值（最贴近当前系统实际）
+  # 支持 @dll,-id 和 ms-resource: 两种间接格式，以及普通字符串
+  if ($directName) {
+    if ($directName.StartsWith('@') -or $directName.StartsWith('ms-resource:')) {
+      try {
+        $resolved = [CmHelper]::ResolveIndirect($directName)
+        if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+      } catch {}
+    } else {
+      $lc = $directName.ToLower()
+      if ($lc -notmatch '外壳服务对象' -and
+          $lc -notmatch 'shell service object' -and
+          $lc -notmatch 'shell extension') { return $directName }
+    }
   }
   if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
     $clsidPath = 'HKCR:\\CLSID\\' + $clsid
@@ -283,7 +277,7 @@ function Resolve-ExtName($clsid, $fallback) {
       # 注意：FriendlyTypeName 是 COM 类型描述（如"外壳服务对象"），不是菜单名，已移除
       $raw = $clsidKey.GetValue('LocalizedString')
       if ($raw) {
-        if ($raw.StartsWith('@')) {
+        if ($raw.StartsWith('@') -or $raw.StartsWith('ms-resource:')) {
           try {
             $resolved = [CmHelper]::ResolveIndirect($raw)
             if ($resolved -and $resolved.Length -ge 2) { return $resolved }
@@ -301,7 +295,7 @@ function Resolve-ExtName($clsid, $fallback) {
       # Level 1.5: MUIVerb（部分扩展如 gvim 通过此键注册显示名）
       $muiVerb = $clsidKey.GetValue('MUIVerb')
       if ($muiVerb) {
-        if ($muiVerb.StartsWith('@')) {
+        if ($muiVerb.StartsWith('@') -or $muiVerb.StartsWith('ms-resource:')) {
           try {
             $resolved = [CmHelper]::ResolveIndirect($muiVerb)
             if ($resolved -and $resolved.Length -ge 2) { return $resolved }
@@ -324,16 +318,27 @@ if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }
 $handlers = Get-ChildItem -LiteralPath $shellexPath | Where-Object { $_.PSIsContainer }
 $result = @($handlers | ForEach-Object {
   $handlerKeyName = $_.PSChildName
-  $clsid = $_.GetValue('')
-  if (-not $clsid) { $clsid = $handlerKeyName }
+  $defaultVal  = $_.GetValue('')
   $cleanName   = $handlerKeyName -replace '^-+', ''
-  $displayName = Resolve-ExtName $clsid $cleanName
+  # 实际 CLSID：键名若为 CLSID 格式则优先；否则检查默认值是否为 CLSID
+  $actualClsid = $cleanName
+  if ($cleanName -notmatch '^\{[0-9A-Fa-f-]+\}$' -and
+      $defaultVal -match '^\{[0-9A-Fa-f-]+\}$') {
+    $actualClsid = $defaultVal
+  }
+  # 直接名称：仅当键名是 CLSID 格式且默认值是非 CLSID 字符串时
+  $directName = $null
+  if ($actualClsid -eq $cleanName -and $defaultVal -and
+      $defaultVal -notmatch '^\{[0-9A-Fa-f-]+\}$' -and $defaultVal.Length -ge 2) {
+    $directName = $defaultVal
+  }
+  $displayName = Resolve-ExtName $actualClsid $cleanName $directName
   $displayName = Format-DisplayName $displayName
   $isEnabled   = -not $handlerKeyName.StartsWith('-')
   $regKey = '${shellexSubPath}\\' + $cleanName
   $dllPath = $null
-  if ($clsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
-    $inprocPath = 'HKCR:\\CLSID\\' + $clsid + '\\InprocServer32'
+  if ($actualClsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
+    $inprocPath = 'HKCR:\\CLSID\\' + $actualClsid + '\\InprocServer32'
     if (Test-Path -LiteralPath $inprocPath) {
       $raw = (Get-Item -LiteralPath $inprocPath).GetValue('')
       if ($raw) { $dllPath = [System.Environment]::ExpandEnvironmentVariables($raw) }
@@ -341,7 +346,7 @@ $result = @($handlers | ForEach-Object {
   }
   [PSCustomObject]@{
     name        = [string]$displayName
-    command     = [string]$clsid
+    command     = [string]$actualClsid
     iconPath    = $null
     isEnabled   = [bool]$isEnabled
     source      = [string]$handlerKeyName

@@ -67,31 +67,31 @@ export class RegistryService {
     const shellexPath = SCENE_SHELLEX_PATHS[scene];
     
     try {
-      // 读取 Classic Shell 命令
+      // 并行读取 Classic Shell 命令 + Shell 扩展（COM ContextMenuHandlers）
       const script = this.ps.buildGetItemsScript(basePath);
-      const raw = await this.ps.execute<PsMenuItemRaw[]>(script);
+      const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
+      const [raw, shellexRaw] = await Promise.all([
+        this.ps.execute<PsMenuItemRaw[]>(script),
+        this.ps.execute<PsMenuItemRaw[]>(shellexScript).catch((e) => {
+          log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
+          return [] as PsMenuItemRaw[];
+        }),
+      ]);
       const items = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-
-      // 读取 Shell 扩展（COM ContextMenuHandlers），失败不阻断主流程
-      let shellexItems: PsMenuItemRaw[] = [];
-      try {
-        const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
-        const shellexRaw = await this.ps.execute<PsMenuItemRaw[]>(shellexScript);
-        shellexItems = Array.isArray(shellexRaw) ? shellexRaw : (shellexRaw ? [shellexRaw] : []);
-      } catch (e) {
-        log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
-      }
+      const shellexItems = Array.isArray(shellexRaw) ? shellexRaw : [];
 
       const result = [...items, ...shellexItems].map((r) => ({
         id: this.nextId++,
-        name: (r.name && !r.name.startsWith('@')) ? r.name : (r.subKeyName || r.name),
+        name: this.cleanDisplayName(
+          (r.name && !r.name.startsWith('@')) ? r.name : (r.subKeyName || r.name)
+        ),
         command: r.command,
         iconPath: r.iconPath,
         isEnabled: r.isEnabled,
         source: r.source || this.inferSource(r.subKeyName),
         menuScene: scene,
         registryKey: r.registryKey,
-        type: this.determineType(r.itemType),
+        type: this.determineType(r.itemType, r.command),
       }));
 
       // 写入缓存
@@ -219,8 +219,20 @@ export class RegistryService {
     return subKeyName || '';
   }
 
-  private determineType(itemType?: string): MenuItemType {
+  private cleanDisplayName(name: string): string {
+    if (!name) return name;
+    return name
+      .replace(/\(&\w\)/g, '')   // ① 先处理带括号加速键整体：(&R)、(&E)、(&V)
+      .replace(/\(\w\)/g, '')    // ② 单字母括号：(P)、(D)
+      .replace(/&\w/g, '')       // ③ 裸加速键：&O、&L（兜底）
+      .replace(/\(\s*\)/g, '')   // ④ 空括号兜底（防止顺序问题留下残留）
+      .replace(/\s+/g, ' ')      // ⑤ 规范化多余空白
+      .trim();
+  }
+
+  private determineType(itemType?: string, command?: string): MenuItemType {
     if (itemType === 'ShellExt') return MenuItemType.ShellExt;
+    if (command && command.trim()) return MenuItemType.Custom;
     return MenuItemType.System;
   }
 }

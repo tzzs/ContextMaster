@@ -56,8 +56,40 @@ describe('RegistryService', () => {
         isEnabled: true,
         source: 'TestApp',
         menuScene: MenuScene.File,
-        type: MenuItemType.System,
+        type: MenuItemType.Custom,
       });
+    });
+  });
+
+  describe('名称净化（热键清理）', () => {
+    it('应清理带括号加速键整体，不留残余括号', async () => {
+      const cases = [
+        { input: '使用 Visual Studio 打开(&V)', expected: '使用 Visual Studio 打开' },
+        { input: '个性化(&R)', expected: '个性化' },
+        { input: '加入 QQ音乐 播放队列(&E)', expected: '加入 QQ音乐 播放队列' },
+      ];
+
+      for (const { input, expected } of cases) {
+        const rawItems = [{
+          name: input,
+          command: '',
+          iconPath: null,
+          isEnabled: true,
+          source: '',
+          registryKey: 'DesktopBackground\\Shell\\TestItem',
+          subKeyName: 'TestItem',
+        }];
+
+        // 每次调用需要新的 service 实例（避免缓存）
+        const freshService = new RegistryService(mockPs);
+        mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+        const result = await freshService.getMenuItems(MenuScene.Desktop);
+
+        expect(result[0].name).toBe(expected);
+        expect(result[0].name).not.toContain('(');
+        expect(result[0].name).not.toContain(')');
+      }
     });
   });
 

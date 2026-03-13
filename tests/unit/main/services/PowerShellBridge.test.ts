@@ -128,24 +128,22 @@ describe('PowerShellBridge', () => {
       expect(script).not.toContain('ReadDllStrings');
     });
 
-    it('不应包含 DLL VersionInfo 字段（已移除 FileVersionInfo 级别）', () => {
+    it('仅使用 FileDescription/ProductName，不扫描 InternalName/OriginalFilename', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
       expect(script).not.toContain('InternalName');
       expect(script).not.toContain('OriginalFilename');
-      expect(script).not.toContain('FileDescription');
-      expect(script).not.toContain('FileVersionInfo');
     });
 
-    it('不应以 foreach 遍历 VersionInfo 字段（DLL VersionInfo 已移除）', () => {
+    it('Level 2.5 使用 FileVersionInfo::GetVersionInfo，不遍历所有字段', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
-      expect(script).not.toContain('FileVersionInfo');
-      expect(script).not.toContain('ProductName');
+      expect(script).toContain('FileVersionInfo');
+      expect(script).toContain('ProductName');
     });
 
     it('应将 CLSID Default 值作为 Level 2 兜底', () => {
@@ -228,12 +226,42 @@ describe('PowerShellBridge', () => {
       );
 
       expect(script).toContain('$directName = $null');
-      expect(script).toContain('Level 0: handler key');
-      // Level 0 的位置应在 Level 1 LocalizedString 之前
-      const level0Idx = script.indexOf('Level 0: handler key');
+      expect(script).toContain('Level 0: directName');
+      // Level 0（间接格式）的位置应在 Level 1 LocalizedString 之前
+      const level0Idx = script.indexOf('Level 0: directName');
       const level1Idx = script.indexOf('Level 1: LocalizedString');
       expect(level0Idx).toBeGreaterThan(0);
       expect(level1Idx).toBeGreaterThan(level0Idx);
+    });
+
+    it('plain string directName 应降级到 CLSID 查询链之后（Level 3）', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      expect(script).toContain('Level 3: directName');
+      // Level 3 注释必须在 Level 2 之后
+      const level2Idx = script.indexOf('Level 2: CLSID 默认值');
+      const level3Idx = script.indexOf('Level 3: directName');
+      expect(level2Idx).toBeGreaterThan(0);
+      expect(level3Idx).toBeGreaterThan(level2Idx);
+    });
+
+    it('应预建 CommandStore 反向索引并在 Level 1.7 查找', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      // 预建索引存在
+      expect(script).toContain('cmdStoreVerbs');
+      expect(script).toContain('CommandStore');
+      expect(script).toContain('ExplorerCommandHandler');
+      // Level 1.7 存在且位于 Level 1.5 与 Level 2 之间
+      const level15Idx = script.indexOf('Level 1.5:');
+      const level17Idx = script.indexOf('Level 1.7:');
+      const level2Idx  = script.indexOf('Level 2: CLSID 默认值');
+      expect(level17Idx).toBeGreaterThan(level15Idx);
+      expect(level2Idx).toBeGreaterThan(level17Idx);
     });
 
     it('CmHelper.ResolveIndirect 应支持 ms-resource: 前缀', () => {
@@ -262,6 +290,26 @@ describe('PowerShellBridge', () => {
       expect(script).toContain('$defaultVal');
       // command 字段应使用 $actualClsid，而非旧的 $clsid
       expect(script).toContain('command     = [string]$actualClsid');
+    });
+
+    it('InprocServer32 DLL FileDescription/ProductName 应作为 Level 2.5', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      // Level 2.5 注释存在
+      expect(script).toContain('Level 2.5:');
+      // 使用 FileVersionInfo::GetVersionInfo
+      expect(script).toContain('FileVersionInfo]::GetVersionInfo');
+      // 包含过滤关键词
+      expect(script).toMatch(/shell.*extension/i);
+      expect(script).toMatch(/context.*menu/i);
+      // Level 2.5 位于 Level 2 之后、Level 3 之前
+      const level2Idx  = script.indexOf('Level 2: CLSID 默认值');
+      const level25Idx = script.indexOf('Level 2.5:');
+      const level3Idx  = script.indexOf('Level 3: directName');
+      expect(level25Idx).toBeGreaterThan(level2Idx);
+      expect(level3Idx).toBeGreaterThan(level25Idx);
     });
   });
 

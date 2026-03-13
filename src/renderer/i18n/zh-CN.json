@@ -1,0 +1,192 @@
+{
+  "translation": {
+    "app": {
+      "name": "ContextMaster",
+      "title": "Windows 右键菜单管理工具",
+      "description": "Windows 右键菜单管理工具"
+    },
+    "nav": {
+      "menuScenes": "菜单场景",
+      "management": "管理",
+      "desktop": "桌面右键",
+      "file": "文件右键",
+      "folder": "文件夹右键",
+      "drive": "驱动器右键",
+      "directoryBackground": "目录背景",
+      "recycleBin": "回收站右键",
+      "history": "操作记录",
+      "backup": "备份管理",
+      "settings": "设置"
+    },
+    "main": {
+      "search": "全局搜索...",
+      "all": "全部",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "items": "个条目",
+      "addItem": "新增条目",
+      "loading": "加载中...",
+      "loadFailed": "加载失败",
+      "noItems": "暂无条目",
+      "selectItem": "选择条目",
+      "selectItemDesc": "在左侧选择一个条目查看详情",
+      "noItemSelected": "未选中任何条目",
+      "operationFailed": "操作失败",
+      "actionDone": "已",
+      "callFailed": "调用失败",
+      "deleteDev": "删除功能开发中",
+      "searchResults": "搜索结果",
+      "matchesFor": "个匹配",
+      "noMatchFor": "未找到匹配"
+    },
+    "item": {
+      "name": "名称",
+      "status": "状态",
+      "type": "类型",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "custom": "自定义",
+      "system": "系统",
+      "shellExt": "Shell 扩展",
+      "source": "来源程序",
+      "sourceUnknown": "未知来源",
+      "command": "执行命令",
+      "scene": "场景",
+      "registryPath": "注册表路径",
+      "copyPath": "复制路径",
+      "openInRegedit": "在注册表编辑器中打开",
+      "locateInRegedit": "在 Regedit 中定位",
+      "locateFailed": "定位失败",
+      "comObject": "COM 对象",
+      "commandSubkey": "命令子键路径"
+    },
+    "detail": {
+      "enableDisable": "启用/禁用",
+      "edit": "编辑",
+      "delete": "删除",
+      "disabledNote": "已在注册表项下写入 LegacyDisable 键值使其禁用",
+      "disabledNoteShellExt": "已将注册表键名添加 - 前缀使其禁用（Shell 扩展机制）"
+    },
+    "history": {
+      "title": "操作记录",
+      "recent": "最近操作",
+      "clearAll": "清除全部",
+      "undo": "撤销",
+      "noRecords": "暂无操作记录",
+      "undoFailed": "撤销失败",
+      "undoSuccess": "撤销成功",
+      "confirmClear": "确定清除所有操作记录？",
+      "today": "今天",
+      "yesterday": "昨天",
+      "operation": {
+        "enable": "启用",
+        "disable": "禁用",
+        "create": "新增",
+        "delete": "删除",
+        "update": "修改",
+        "backup": "备份",
+        "restore": "恢复"
+      }
+    },
+    "backup": {
+      "title": "备份管理",
+      "import": "导入备份",
+      "create": "新建备份",
+      "auto": "自动",
+      "manual": "手动",
+      "warning": "恢复备份会覆盖当前配置，建议先手动创建快照",
+      "items": "条目",
+      "fileSize": "文件大小",
+      "restore": "恢复",
+      "delete": "删除",
+      "export": "导出",
+      "loadFailed": "加载备份失败",
+      "noBackups": "暂无备份",
+      "enterNote": "请输入备份备注：",
+      "manualBackup": "手动备份",
+      "createFailed": "创建备份失败",
+      "backupCreated": "备份已创建",
+      "previewFailed": "预览差异失败",
+      "willRestore": "将恢复备份",
+      "itemsWillChange": "共有 {{count}} 个条目状态将变更",
+      "autoSnapshot": "系统将自动创建当前状态的快照",
+      "confirmContinue": "确定继续？",
+      "noDiff": "备份",
+      "noNeedRestore": "与当前状态无差异，无需恢复",
+      "restoreFailed": "恢复失败",
+      "restored": "已恢复备份",
+      "exportFailed": "导出失败",
+      "noFileSelected": "未选择文件",
+      "importFailed": "导入失败",
+      "imported": "备份已导入",
+      "confirmDelete": "确定删除这个备份？此操作不可撤销。",
+      "deleteFailed": "删除失败"
+    },
+    "settings": {
+      "title": "设置",
+      "appearance": {
+        "title": "外观",
+        "theme": "主题",
+        "themeDesc": "选择应用主题外观",
+        "themeSystem": "跟随系统",
+        "themeLight": "浅色",
+        "themeDark": "深色",
+        "language": "语言",
+        "languageDesc": "选择界面语言"
+      },
+      "permission": {
+        "title": "权限",
+        "admin": "管理员权限",
+        "adminGranted": "已获取管理员权限",
+        "adminNotGranted": "未以管理员身份运行",
+        "restartAsAdmin": "以管理员重启"
+      },
+      "backup": {
+        "title": "备份与安全",
+        "autoBackup": "自动备份",
+        "autoBackupDesc": "批量操作前自动创建配置快照",
+        "confirmDanger": "高危操作二次确认",
+        "confirmDangerDesc": "删除条目等操作前弹出确认对话框"
+      },
+      "logs": {
+        "title": "日志",
+        "logFiles": "日志文件",
+        "logDesc": "运行日志保留最近 7 天，存储于应用数据目录下的 logs 文件夹",
+        "openLogDir": "打开日志文件夹"
+      },
+      "about": {
+        "title": "关于",
+        "version": "ContextMaster v1.0.0",
+        "description": "Windows 右键菜单管理工具，基于 Electron + TypeScript 构建",
+        "developer": "开发者",
+        "license": "开源协议",
+        "mit": "MIT License · 开源免费，欢迎贡献",
+        "source": "源码仓库"
+      }
+    },
+    "statusBar": {
+      "adminMode": "管理员模式",
+      "standardMode": "标准模式（操作时自动提权）",
+      "currentScene": "当前场景：",
+      "enabled": "已启用",
+      "disabled": "禁用"
+    },
+    "common": {
+      "confirm": "确定",
+      "cancel": "取消",
+      "save": "保存",
+      "close": "关闭",
+      "search": "搜索",
+      "loading": "加载中...",
+      "error": "错误",
+      "success": "成功",
+      "warning": "警告"
+    },
+    "window": {
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "restore": "还原",
+      "close": "关闭"
+    }
+  }
+}

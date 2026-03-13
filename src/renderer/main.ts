@@ -1,10 +1,16 @@
 import './api/bridge';
+import './styles/themes.css';
 import { MenuScene } from '../shared/enums';
 import type { MenuItemEntry } from '../shared/types';
-import { loadScene, SCENE_NAMES, preloadBadgeCounts, renderGlobalResults, restoreSceneTitle } from './pages/mainPage';
-import { loadHistory, renderHistory, filterHistory, clearAllHistory } from './pages/historyPage';
-import { loadBackups, renderBackup, createBackup, importBackup } from './pages/backupPage';
+import { loadScene, preloadBadgeCounts, renderGlobalResults, restoreSceneTitle } from './pages/mainPage';
+import { loadHistory, filterHistory, clearAllHistory } from './pages/historyPage';
+import { loadBackups, createBackup, importBackup } from './pages/backupPage';
 import { initSettings, requestAdminRestart, toggleSwitch, openLogDir } from './pages/settingsPage';
+
+// i18n 和主题
+import { initI18n, t, updatePageTranslations, registerRefreshCallback } from './i18n';
+import { initTheme, getThemeManager } from './utils/themeManager';
+import { getSettingsStore } from './utils/settingsStore';
 
 // ── 全局搜索 ──
 let allScenesCache: Map<MenuScene, MenuItemEntry[]> | null = null;
@@ -79,8 +85,6 @@ let currentPage: PageId = 'main';
 let currentScene: MenuScene = MenuScene.Desktop;
 
 async function switchPage(page: PageId, navEl?: HTMLElement, scene?: MenuScene): Promise<void> {
-  // 切换场景时清空搜索状态
-  allScenesCache = null;
   const searchEl = document.getElementById('globalSearch') as HTMLInputElement | null;
   if (searchEl) searchEl.value = '';
 
@@ -109,23 +113,30 @@ async function updateMaximizeBtn(): Promise<void> {
   const btn = document.getElementById('winMaximize');
   if (!btn) return;
   const isMax = await window.api.isMaximized();
-  btn.title = isMax ? '还原' : '最大化';
+  btn.title = isMax ? t('window.restore') : t('window.maximize');
 }
 
-// ── 管理员状态检查 ──
 async function checkAdminStatus(): Promise<void> {
   const result = await window.api.isAdmin();
   const isAdmin = result.success && result.data;
 
-  // 状态栏
   const sbDot = document.getElementById('sbDot') as HTMLElement | null;
   const sbAdmin = document.getElementById('sbAdmin');
   if (sbDot) sbDot.style.background = isAdmin ? '#70D070' : 'rgba(255,255,255,0.4)';
-  if (sbAdmin) sbAdmin.textContent = isAdmin ? '管理员模式' : '标准模式（操作时自动提权）';
+  if (sbAdmin) sbAdmin.textContent = isAdmin ? t('statusBar.adminMode') : t('statusBar.standardMode');
   if (sbAdmin) {
     (sbAdmin as HTMLElement).style.cursor = '';
     (sbAdmin as HTMLElement).onclick = null;
   }
+}
+
+function refreshMainContent(): void {
+  updateMaximizeBtn();
+  checkAdminStatus();
+}
+
+function invalidateAllScenesCache(): void {
+  allScenesCache = null;
 }
 
 // ── 暴露给 HTML inline onclick ──
@@ -135,6 +146,7 @@ Object.assign(window, {
   doUndo,
   switchPage,
   updateMaximizeBtn,
+  invalidateAllScenesCache,
   // History
   filterHistory: (mode: string, btn: HTMLElement) => filterHistory(mode, btn),
   clearHistory: clearAllHistory,
@@ -149,6 +161,24 @@ Object.assign(window, {
 
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded', async () => {
+  // 初始化 i18n 和主题（从设置中读取）
+  const settingsStore = getSettingsStore();
+  const settings = settingsStore.getSettings();
+  
+  // 初始化主题
+  initTheme();
+  const themeManager = getThemeManager();
+  themeManager.setTheme(settings.theme);
+  
+  // 初始化 i18n
+  await initI18n(settings.language);
+  
+  // 应用页面翻译
+  updatePageTranslations();
+  
+  // 注册语言切换刷新回调
+  registerRefreshCallback(refreshMainContent);
+
   // 管理员检查
   await checkAdminStatus();
 

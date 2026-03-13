@@ -34,6 +34,7 @@ export interface WindowApi {
   openRegedit(fullRegPath: string): Promise<IpcResult<boolean>>;
   copyToClipboard(text: string): Promise<IpcResult<boolean>>;
   openLogDir(): Promise<IpcResult<boolean>>;
+  logToFile(level: 'info' | 'warn' | 'error', message: string): Promise<void>;
 
   minimizeWindow(): Promise<void>;
   maximizeWindow(): Promise<void>;

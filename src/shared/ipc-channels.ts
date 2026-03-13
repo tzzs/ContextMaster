@@ -26,6 +26,7 @@ export const IPC = {
   SYS_OPEN_LOG_DIR:     'sys:openLogDir',
   SYS_COPY_CLIPBOARD:   'sys:copyClipboard',
   SYS_OPEN_EXTERNAL:    'sys:openExternal',
+  SYS_LOG_TO_FILE:      'sys:logToFile',
   WIN_MINIMIZE:         'win:minimize',
   WIN_MAXIMIZE:         'win:maximize',
   WIN_CLOSE:            'win:close',

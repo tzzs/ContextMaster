@@ -28,6 +28,7 @@ describe('IPC Registry Handlers', () => {
       toggleItem: vi.fn(),
       batchEnable: vi.fn(),
       batchDisable: vi.fn(),
+      invalidateCache: vi.fn(),
     } as MockedObject<MenuManagerService>;
 
     registerRegistryHandlers(mockMenuManager);

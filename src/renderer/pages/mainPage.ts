@@ -1,8 +1,8 @@
 import '../api/bridge';
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import type { MenuItemEntry, ToggleItemParams } from '../../shared/types';
+import { t, registerRefreshCallback } from '../i18n';
 
-// ── 场景映射 ──
 export const SCENE_REG_ROOTS: Record<MenuScene, string> = {
   [MenuScene.Desktop]:            'HKEY_CLASSES_ROOT\\DesktopBackground\\Shell',
   [MenuScene.File]:               'HKEY_CLASSES_ROOT\\*\\shell',
@@ -12,28 +12,44 @@ export const SCENE_REG_ROOTS: Record<MenuScene, string> = {
   [MenuScene.RecycleBin]:         'HKEY_CLASSES_ROOT\\CLSID\\{645FF040-5081-101B-9F08-00AA002F954E}\\shell',
 };
 
-export const SCENE_NAMES: Record<MenuScene, string> = {
-  [MenuScene.Desktop]:            '桌面右键',
-  [MenuScene.File]:               '文件右键',
-  [MenuScene.Folder]:             '文件夹右键',
-  [MenuScene.Drive]:              '驱动器右键',
-  [MenuScene.DirectoryBackground]:'目录背景',
-  [MenuScene.RecycleBin]:         '回收站右键',
-};
+export function getSceneName(scene: MenuScene): string {
+  const sceneKeys: Record<MenuScene, string> = {
+    [MenuScene.Desktop]:            'nav.desktop',
+    [MenuScene.File]:               'nav.file',
+    [MenuScene.Folder]:             'nav.folder',
+    [MenuScene.Drive]:              'nav.drive',
+    [MenuScene.DirectoryBackground]:'nav.directoryBackground',
+    [MenuScene.RecycleBin]:         'nav.recycleBin',
+  };
+  return t(sceneKeys[scene]);
+}
 
-// ── 状态 ──
 let currentItems: MenuItemEntry[] = [];
 let selectedItemId: number | null = null;
 let filterMode: 'all' | 'enabled' | 'disabled' = 'all';
 let loadingScene = false;
+let currentScene: MenuScene = MenuScene.Desktop;
 
-// ── 加载场景数据 ──
+export function refreshCurrentContent(): void {
+  renderItems();
+  updateSceneHeader(currentScene);
+  updateStatusBar(currentScene);
+  if (selectedItemId !== null) {
+    showDetail(selectedItemId);
+  } else {
+    resetDetailPanel();
+  }
+}
+
+registerRefreshCallback(refreshCurrentContent);
+
 export async function loadScene(scene: MenuScene): Promise<void> {
   if (loadingScene) return;
   loadingScene = true;
+  currentScene = scene;
 
   const listEl = document.getElementById('itemList');
-  if (listEl) listEl.innerHTML = `<div class="empty-state"><div>加载中…</div></div>`;
+  if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;
 
   selectedItemId = null;
   resetDetailPanel();
@@ -42,7 +58,7 @@ export async function loadScene(scene: MenuScene): Promise<void> {
   loadingScene = false;
 
   if (!result.success) {
-    showError(`加载失败: ${result.error}`);
+    showError(`${t('main.loadFailed')}: ${result.error}`);
     return;
   }
 
@@ -73,7 +89,7 @@ export function renderItems(): void {
   if (!items.length) {
     listEl.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-      <div>暂无条目</div>
+      <div>${t('main.noItems')}</div>
     </div>`;
     return;
   }
@@ -85,16 +101,16 @@ function renderItemCard(item: MenuItemEntry, showScene = false): string {
   const isSelected = item.id === selectedItemId;
   const typeTag =
     item.type === MenuItemType.Custom
-      ? '<span class="tag tag-custom">自定义</span>'
+      ? `<span class="tag tag-custom">${t('item.custom')}</span>`
       : item.type === MenuItemType.ShellExt
-        ? '<span class="tag tag-shellext">Shell 扩展</span>'
-        : '<span class="tag tag-system">系统</span>';
+        ? `<span class="tag tag-shellext">${t('item.shellExt')}</span>`
+        : `<span class="tag tag-system">${t('item.system')}</span>`;
   const stateTag = item.isEnabled
-    ? '<span class="tag tag-enabled">已启用</span>'
-    : '<span class="tag tag-disabled">已禁用</span>';
+    ? `<span class="tag tag-enabled">${t('item.enabled')}</span>`
+    : `<span class="tag tag-disabled">${t('item.disabled')}</span>`;
   const sourceText = showScene
-    ? `${SCENE_NAMES[item.menuScene]}${item.source ? ' · ' + item.source : ''}`
-    : (item.source || '未知来源');
+    ? `${getSceneName(item.menuScene)}${item.source ? ' · ' + item.source : ''}`
+    : (item.source || t('item.sourceUnknown'));
 
   return `
   <div class="item-card${item.isEnabled ? '' : ' disabled-row'}${isSelected ? ' selected' : ''}"
@@ -149,7 +165,7 @@ export async function toggleItem(id: number): Promise<void> {
 
   const result = await window.api.toggleItem(params);
   if (!result.success) {
-    showOperationError(`操作失败: ${result.error}`);
+    showOperationError(`${t('main.operationFailed')}: ${result.error}`);
     return;
   }
 
@@ -158,9 +174,10 @@ export async function toggleItem(id: number): Promise<void> {
     item.registryKey = result.data.newRegistryKey;
   }
   renderItems();
-  const action = item.isEnabled ? '启用' : '禁用';
-  (window as Window & { showUndo?: (msg: string, itemId: number) => void })
-    .showUndo?.(`已${action}「${item.name}」`, id);
+  const action = item.isEnabled ? t('history.operation.enable') : t('history.operation.disable');
+  (window as Window & { showUndo?: (msg: string, itemId: number) => void; invalidateAllScenesCache?: () => void })
+    .showUndo?.(`${t('main.actionDone')}${action}「${item.name}」`, id);
+  (window as Window & { invalidateAllScenesCache?: () => void }).invalidateAllScenesCache?.();
 
   updateStatusBarFromCurrent();
   if (selectedItemId === id) showDetail(id);
@@ -187,12 +204,11 @@ export function showDetail(id: number): void {
   const regCmdPath = isShellExt
     ? `(COM DLL，CLSID: ${item.command})`
     : `${regItemPath}\\command`;
-  // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
   const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const disabledNoteContent = isShellExt
-    ? `已将注册表键名添加 <code style="background:rgba(196,43,28,0.08);padding:0 3px;border-radius:2px;font-family:Consolas;">-</code> 前缀使其禁用（Shell 扩展机制）`
-    : `已在注册表项下写入 <code style="background:rgba(196,43,28,0.08);padding:0 3px;border-radius:2px;font-family:Consolas;">LegacyDisable</code> 键值使其禁用`;
+    ? t('detail.disabledNoteShellExt')
+    : t('detail.disabledNote');
   const legacyNote = item.isEnabled ? '' : `
     <div style="display:flex;align-items:flex-start;gap:6px;background:var(--danger-bg);border:1px solid rgba(196,43,28,0.18);border-radius:var(--radius-sm);padding:7px 9px;margin-top:4px;">
       <svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:var(--danger);flex-shrink:0;margin-top:1px;"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
@@ -205,45 +221,45 @@ export function showDetail(id: number): void {
   const actionsEl = document.getElementById('detailActions');
 
   if (nameEl) nameEl.textContent = item.name;
-  if (subEl) subEl.textContent = item.source || '未知来源';
+  if (subEl) subEl.textContent = item.source || t('item.sourceUnknown');
   if (bodyEl) bodyEl.innerHTML = `
     <div class="detail-field">
-      <div class="detail-field-label">名称</div>
+      <div class="detail-field-label">${t('item.name')}</div>
       <div class="detail-field-value">${escapeHtml(item.name)}</div>
     </div>
     <div class="detail-field">
-      <div class="detail-field-label">状态</div>
+      <div class="detail-field-label">${t('item.status')}</div>
       <div class="detail-field-value">
-        <span class="tag ${item.isEnabled ? 'tag-enabled' : 'tag-disabled'}">${item.isEnabled ? '已启用' : '已禁用'}</span>
+        <span class="tag ${item.isEnabled ? 'tag-enabled' : 'tag-disabled'}">${item.isEnabled ? t('item.enabled') : t('item.disabled')}</span>
       </div>
     </div>
     <div class="detail-field">
-      <div class="detail-field-label">类型</div>
+      <div class="detail-field-label">${t('item.type')}</div>
       <div class="detail-field-value">
-        <span class="tag ${item.type === MenuItemType.Custom ? 'tag-custom' : item.type === MenuItemType.ShellExt ? 'tag-shellext' : 'tag-system'}">${item.type === MenuItemType.Custom ? '自定义' : item.type === MenuItemType.ShellExt ? 'Shell 扩展' : '系统'}</span>
+        <span class="tag ${item.type === MenuItemType.Custom ? 'tag-custom' : item.type === MenuItemType.ShellExt ? 'tag-shellext' : 'tag-system'}">${item.type === MenuItemType.Custom ? t('item.custom') : item.type === MenuItemType.ShellExt ? t('item.shellExt') : t('item.system')}</span>
       </div>
     </div>
     <div class="detail-field">
-      <div class="detail-field-label">来源程序</div>
+      <div class="detail-field-label">${t('item.source')}</div>
       <div class="detail-field-value">${escapeHtml(item.source || '—')}</div>
     </div>
     <div class="detail-field">
-      <div class="detail-field-label">执行命令</div>
+      <div class="detail-field-label">${t('item.command')}</div>
       <div class="detail-field-value mono">${escapeHtml(item.command || '—')}</div>
     </div>
     <div class="detail-field">
-      <div class="detail-field-label">场景</div>
-      <div class="detail-field-value">${SCENE_NAMES[item.menuScene]}</div>
+      <div class="detail-field-label">${t('item.scene')}</div>
+      <div class="detail-field-value">${getSceneName(item.menuScene)}</div>
     </div>
 
     <div style="height:1px;background:var(--border2);margin:10px 0 12px;"></div>
 
     <div class="detail-field">
-      <div class="detail-field-label">注册表路径</div>
+      <div class="detail-field-label">${t('item.registryPath')}</div>
       <div style="position:relative;">
         <div class="detail-field-value mono" style="padding-right:28px;word-break:break-all;line-height:1.6;">${escapeHtml(regItemPath)}</div>
         <button onclick="window.api.copyToClipboard('${regItemPathAttr}').then(() => window._mainPage.flashCopyBtn(this))"
-          title="复制路径"
+          title="${t('item.copyPath')}"
           style="position:absolute;top:4px;right:4px;width:20px;height:20px;border:none;background:transparent;cursor:pointer;border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--text3);">
           <svg viewBox="0 0 16 16" style="width:11px;height:11px;fill:currentColor;"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>
         </button>
@@ -252,16 +268,16 @@ export function showDetail(id: number): void {
     </div>
 
     <div class="detail-field">
-      <div class="detail-field-label">${isShellExt ? 'COM 对象' : '命令子键路径'}</div>
+      <div class="detail-field-label">${isShellExt ? t('item.comObject') : t('item.commandSubkey')}</div>
       <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
     </div>
 
     <div class="detail-field">
-      <div class="detail-field-label">在注册表编辑器中打开</div>
-      <button onclick="window.api.openRegedit('${regItemPathAttr}').then(r=>{if(!r.success)alert('定位失败: '+r.error);}).catch(e=>alert('调用失败: '+e))"
+      <div class="detail-field-label">${t('item.openInRegedit')}</div>
+      <button onclick="window.api.openRegedit('${regItemPathAttr}').then(r=>{if(!r.success)alert('${t('item.locateFailed')}: '+r.error);}).catch(e=>alert('${t('main.callFailed')}: '+e))"
         style="display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:11px;cursor:pointer;color:var(--text2);font-family:inherit;margin-top:2px;">
         <svg viewBox="0 0 16 16" style="width:11px;height:11px;fill:currentColor;"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5v-9z"/></svg>
-        在 Regedit 中定位
+        ${t('item.locateInRegedit')}
       </button>
     </div>
   `;
@@ -285,7 +301,7 @@ export function setFilter(mode: 'all' | 'enabled' | 'disabled', btn: HTMLElement
 // ── 状态栏 ──
 function updateStatusBar(scene: MenuScene): void {
   const sbScene = document.getElementById('sbScene');
-  if (sbScene) sbScene.textContent = `当前场景：${SCENE_NAMES[scene]}`;
+  if (sbScene) sbScene.textContent = `${t('statusBar.currentScene')}${getSceneName(scene)}`;
   updateStatusBarFromCurrent();
 }
 
@@ -293,13 +309,13 @@ function updateStatusBarFromCurrent(): void {
   const enabled = currentItems.filter((i) => i.isEnabled).length;
   const disabled = currentItems.length - enabled;
   const sbCount = document.getElementById('sbCount');
-  if (sbCount) sbCount.textContent = `已启用 ${enabled} / 禁用 ${disabled}`;
+  if (sbCount) sbCount.textContent = `${t('statusBar.enabled')} ${enabled} / ${t('statusBar.disabled')} ${disabled}`;
 }
 
 function updateSceneHeader(scene: MenuScene): void {
   const titleEl = document.getElementById('sceneTitle');
   if (titleEl) {
-    titleEl.innerHTML = `${SCENE_NAMES[scene]} <span>${currentItems.length} 个条目</span>`;
+    titleEl.innerHTML = `${getSceneName(scene)} <span>${currentItems.length} ${t('main.items')}</span>`;
   }
   const badgeEl = document.getElementById(`badge-${scene}`);
   if (badgeEl) badgeEl.textContent = String(currentItems.length);
@@ -310,11 +326,11 @@ function resetDetailPanel(): void {
   const subEl = document.getElementById('detailSub');
   const bodyEl = document.getElementById('detailBody');
   const actionsEl = document.getElementById('detailActions');
-  if (nameEl) nameEl.textContent = '选择条目';
-  if (subEl) subEl.textContent = '在左侧选择一个条目查看详情';
+  if (nameEl) nameEl.textContent = t('main.selectItem');
+  if (subEl) subEl.textContent = t('main.selectItemDesc');
   if (bodyEl) bodyEl.innerHTML = `<div class="empty-state" style="height:160px;">
     <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-    <div style="font-size:12px;">未选中任何条目</div>
+    <div style="font-size:12px;">${t('main.noItemSelected')}</div>
   </div>`;
   if (actionsEl) actionsEl.style.display = 'none';
 }
@@ -370,17 +386,15 @@ export function deleteSelected(): void {
   if (selectedItemId == null) return;
   const item = currentItems.find((i) => i.id === selectedItemId);
   if (!item) return;
-  alert(`删除功能开发中\n\n条目：${item.name}`);
+  alert(`${t('main.deleteDev')}\n\n${t('item.name')}: ${item.name}`);
 }
 
-// ── 全局搜索结果渲染 ──
 export function renderGlobalResults(items: MenuItemEntry[], query: string): void {
-  // 切换到 main 页（确保可见）
   document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
   document.getElementById('page-main')?.classList.add('active');
 
   const titleEl = document.getElementById('sceneTitle');
-  if (titleEl) titleEl.innerHTML = `搜索结果 <span>${items.length} 个匹配「${escapeHtml(query)}」</span>`;
+  if (titleEl) titleEl.innerHTML = `${t('main.searchResults')} <span>${items.length} ${t('main.matchesFor')}「${escapeHtml(query)}」</span>`;
 
   selectedItemId = null;
   resetDetailPanel();
@@ -391,7 +405,7 @@ export function renderGlobalResults(items: MenuItemEntry[], query: string): void
   if (!items.length) {
     listEl.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
-      <div>未找到匹配「${escapeHtml(query)}」的条目</div>
+      <div>${t('main.noMatchFor')}「${escapeHtml(query)}」</div>
     </div>`;
     return;
   }
@@ -399,11 +413,10 @@ export function renderGlobalResults(items: MenuItemEntry[], query: string): void
   listEl.innerHTML = items.map((item) => renderItemCard(item, true)).join('');
 }
 
-// ── 恢复场景视图（全局搜索退出时调用）──
 export function restoreSceneTitle(scene: MenuScene): void {
   const titleEl = document.getElementById('sceneTitle');
   if (titleEl) {
-    titleEl.innerHTML = `${SCENE_NAMES[scene]} <span>${currentItems.length} 个条目</span>`;
+    titleEl.innerHTML = `${getSceneName(scene)} <span>${currentItems.length} ${t('main.items')}</span>`;
   }
   renderItems();
   resetDetailPanel();
@@ -412,17 +425,17 @@ export function restoreSceneTitle(scene: MenuScene): void {
 // ── 预加载其余场景的 badge 数量 ──
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
   const allScenes = Object.values(MenuScene) as MenuScene[];
-  for (const scene of allScenes) {
-    if (scene === skipScene) continue;
-    const result = await window.api.getMenuItems(scene);
-    if (result.success) {
+  const scenesToLoad = allScenes.filter((s) => s !== skipScene);
+  
+  await Promise.all(
+    scenesToLoad.map(async (scene) => {
+      const result = await window.api.getMenuItems(scene);
       const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) badgeEl.textContent = String(result.data.length);
-    } else {
-      const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) badgeEl.textContent = '?';
-    }
-  }
+      if (badgeEl) {
+        badgeEl.textContent = result.success ? String(result.data.length) : '?';
+      }
+    })
+  );
 }
 
 // 挂载到 window 供 HTML inline onclick 调用

@@ -8,7 +8,7 @@ import { loadBackups, createBackup, importBackup } from './pages/backupPage';
 import { initSettings, requestAdminRestart, toggleSwitch, openLogDir } from './pages/settingsPage';
 
 // i18n 和主题
-import { initI18n, t, updatePageTranslations } from './i18n';
+import { initI18n, t, updatePageTranslations, registerRefreshCallback } from './i18n';
 import { initTheme, getThemeManager } from './utils/themeManager';
 import { getSettingsStore } from './utils/settingsStore';
 
@@ -132,6 +132,11 @@ async function checkAdminStatus(): Promise<void> {
   }
 }
 
+function refreshMainContent(): void {
+  updateMaximizeBtn();
+  checkAdminStatus();
+}
+
 // ── 暴露给 HTML inline onclick ──
 Object.assign(window, {
   showUndo,
@@ -167,6 +172,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 应用页面翻译
   updatePageTranslations();
+  
+  // 注册语言切换刷新回调
+  registerRefreshCallback(refreshMainContent);
 
   // 管理员检查
   await checkAdminStatus();

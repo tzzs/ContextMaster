@@ -1,7 +1,7 @@
 import '../api/bridge';
 import type { OperationRecord } from '../../shared/types';
 import { OperationType } from '../../shared/enums';
-import { t } from '../i18n';
+import { t, registerRefreshCallback } from '../i18n';
 
 function getOpLabel(type: OperationType): string {
   const opKeys: Record<OperationType, string> = {
@@ -28,6 +28,12 @@ const OP_CSS_CLASS: Record<OperationType, string> = {
 
 let allRecords: OperationRecord[] = [];
 let filterType: string = 'all';
+
+export function refreshHistoryContent(): void {
+  renderHistory();
+}
+
+registerRefreshCallback(refreshHistoryContent);
 
 export async function loadHistory(): Promise<void> {
   const listEl = document.getElementById('historyList');

@@ -14,6 +14,19 @@ const resources = {
   'en-US': enUS,
 };
 
+type RefreshCallback = () => void;
+const refreshCallbacks: Set<RefreshCallback> = new Set();
+
+export function registerRefreshCallback(callback: RefreshCallback): () => void {
+  refreshCallbacks.add(callback);
+  return () => refreshCallbacks.delete(callback);
+}
+
+function triggerRefresh(): void {
+  updatePageTranslations();
+  refreshCallbacks.forEach((cb) => cb());
+}
+
 export function initI18n(lng: SupportedLanguage = 'zh-CN'): Promise<TFunction<'translation', undefined>> {
   return i18next.init({
     lng,
@@ -30,7 +43,9 @@ export function t(key: string, options?: Record<string, unknown>): string {
 }
 
 export function changeLanguage(lng: SupportedLanguage): Promise<TFunction<'translation', undefined>> {
-  return i18next.changeLanguage(lng);
+  const result = i18next.changeLanguage(lng);
+  result.then(() => triggerRefresh());
+  return result;
 }
 
 export function getCurrentLanguage(): SupportedLanguage {

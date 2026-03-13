@@ -1,7 +1,7 @@
 import '../api/bridge';
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import type { MenuItemEntry, ToggleItemParams } from '../../shared/types';
-import { t } from '../i18n';
+import { t, registerRefreshCallback } from '../i18n';
 
 export const SCENE_REG_ROOTS: Record<MenuScene, string> = {
   [MenuScene.Desktop]:            'HKEY_CLASSES_ROOT\\DesktopBackground\\Shell',
@@ -24,16 +24,29 @@ export function getSceneName(scene: MenuScene): string {
   return t(sceneKeys[scene]);
 }
 
-// ── 状态 ──
 let currentItems: MenuItemEntry[] = [];
 let selectedItemId: number | null = null;
 let filterMode: 'all' | 'enabled' | 'disabled' = 'all';
 let loadingScene = false;
+let currentScene: MenuScene = MenuScene.Desktop;
 
-// ── 加载场景数据 ──
+export function refreshCurrentContent(): void {
+  renderItems();
+  updateSceneHeader(currentScene);
+  updateStatusBar(currentScene);
+  if (selectedItemId !== null) {
+    showDetail(selectedItemId);
+  } else {
+    resetDetailPanel();
+  }
+}
+
+registerRefreshCallback(refreshCurrentContent);
+
 export async function loadScene(scene: MenuScene): Promise<void> {
   if (loadingScene) return;
   loadingScene = true;
+  currentScene = scene;
 
   const listEl = document.getElementById('itemList');
   if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;

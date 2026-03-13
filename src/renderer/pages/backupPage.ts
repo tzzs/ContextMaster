@@ -1,9 +1,15 @@
 import '../api/bridge';
 import type { BackupSnapshot } from '../../shared/types';
 import { BackupType } from '../../shared/enums';
-import { t } from '../i18n';
+import { t, registerRefreshCallback } from '../i18n';
 
 let backups: BackupSnapshot[] = [];
+
+export function refreshBackupContent(): void {
+  renderBackup();
+}
+
+registerRefreshCallback(refreshBackupContent);
 
 export async function loadBackups(): Promise<void> {
   const result = await window.api.getBackups();

@@ -143,9 +143,6 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
-    - name: Build application
-      run: pnpm run build
-
     - name: Package application (dry run)
       run: pnpm run package
 
@@ -190,7 +187,6 @@ jobs:
 
     - name: Build and package
       run: |
-        pnpm run build
         pnpm run package
         pnpm run make
 

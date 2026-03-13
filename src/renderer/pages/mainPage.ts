@@ -29,6 +29,7 @@ let selectedItemId: number | null = null;
 let filterMode: 'all' | 'enabled' | 'disabled' = 'all';
 let loadingScene = false;
 let currentScene: MenuScene = MenuScene.Desktop;
+let pendingScene: MenuScene | null = null;
 
 export function refreshCurrentContent(): void {
   renderItems();
@@ -44,9 +45,13 @@ export function refreshCurrentContent(): void {
 registerRefreshCallback(refreshCurrentContent);
 
 export async function loadScene(scene: MenuScene): Promise<void> {
-  if (loadingScene) return;
+  if (loadingScene) {
+    pendingScene = scene;  // 记录最新请求，加载完后执行
+    return;
+  }
   loadingScene = true;
   currentScene = scene;
+  pendingScene = null;
 
   const listEl = document.getElementById('itemList');
   if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;
@@ -59,13 +64,19 @@ export async function loadScene(scene: MenuScene): Promise<void> {
 
   if (!result.success) {
     showError(`${t('main.loadFailed')}: ${result.error}`);
-    return;
+  } else {
+    currentItems = result.data;
+    updateSceneHeader(scene);
+    renderItems();
+    updateStatusBar(scene);
   }
 
-  currentItems = result.data;
-  updateSceneHeader(scene);
-  renderItems();
-  updateStatusBar(scene);
+  // 若加载期间有新的场景请求，执行最新的那个
+  if (pendingScene !== null) {
+    const next = pendingScene;
+    pendingScene = null;
+    await loadScene(next);
+  }
 }
 
 // ── 渲染条目列表 ──

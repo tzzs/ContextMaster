@@ -151,6 +151,7 @@ $result = @($subKeys | ForEach-Object {
   $keyName = $key.PSChildName
   $name = Resolve-MenuName ($key.GetValue('MUIVerb'))
   if (-not $name) { $name = Resolve-MenuName ($key.GetValue('')) }
+  if (-not $name) { $name = Resolve-MenuName ($key.GetValue('LocalizedDisplayName')) }
   if (-not $name) { $name = $keyName }
   $iconPath = $key.GetValue('Icon')
   $isEnabled = ($key.GetValue('LegacyDisable') -eq $null)
@@ -211,11 +212,10 @@ Write-Output '{"ok":true}'
 
   /**
    * 构建枚举 shellex\ContextMenuHandlers 下所有 Shell 扩展的脚本
-   * 使用四级级联策略解析本地化名称：
-   *  1. LocalizedString/FriendlyTypeName → SHLoadIndirectString（解析 @DLL,-ID 格式）
-   *  2. DLL VersionInfo（FileDescription/ProductName/InternalName/OriginalFilename）
-   *  3. CLSID 默认值
-   *  4. 处理程序键名（最终兜底）
+   * 使用三级级联策略解析本地化名称：
+   *  1. LocalizedString → SHLoadIndirectString（@ 格式）或直接使用
+   *  2. CLSID 默认值（可靠、ASCII-safe）
+   *  3. 处理程序键名（最终兜底）
    * CmHelper.dll 编译后缓存至 %LOCALAPPDATA%\ContextMaster\，避免重复编译开销
    */
   buildGetShellExtItemsScript(shellexSubPath: string): string {
@@ -279,44 +279,26 @@ function Resolve-ExtName($clsid, $fallback) {
     $clsidPath = 'HKCR:\\CLSID\\' + $clsid
     if (Test-Path -LiteralPath $clsidPath) {
       $clsidKey = Get-Item -LiteralPath $clsidPath
-      # Level 1: LocalizedString/FriendlyTypeName
-      foreach ($valName in @('LocalizedString', 'FriendlyTypeName')) {
-        $raw = $clsidKey.GetValue($valName)
-        if ($raw) {
-          if ($raw.StartsWith('@')) {
-            try {
-              $resolved = [CmHelper]::ResolveIndirect($raw)
-              if ($resolved -and $resolved.Length -ge 2) { return $resolved }
-            } catch {}
-          } elseif ($raw.Length -ge 2) {
+      # Level 1: LocalizedString（专为 Shell 扩展显示名设计）
+      # 注意：FriendlyTypeName 是 COM 类型描述（如"外壳服务对象"），不是菜单名，已移除
+      $raw = $clsidKey.GetValue('LocalizedString')
+      if ($raw) {
+        if ($raw.StartsWith('@')) {
+          try {
+            $resolved = [CmHelper]::ResolveIndirect($raw)
+            if ($resolved -and $resolved.Length -ge 2) { return $resolved }
+          } catch {}
+        } elseif ($raw.Length -ge 2) {
+          # 过滤泛型 COM 类型描述，这类值不适合作为菜单显示名
+          $lc = $raw.ToLower()
+          if ($lc -notmatch '外壳服务对象' -and
+              $lc -notmatch 'shell service object' -and
+              $lc -notmatch 'shell extension') {
             return $raw
           }
         }
       }
-      $inprocPath = Join-Path $clsidPath 'InprocServer32'
-      if (Test-Path -LiteralPath $inprocPath) {
-        $dllPath = (Get-Item -LiteralPath $inprocPath).GetValue('')
-        # 展开 %SystemRoot% 等环境变量
-        if ($dllPath) {
-          $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllPath)
-        }
-        if ($dllPath -and (Test-Path -LiteralPath $dllPath)) {
-          # Level 2: DLL VersionInfo（FileDescription / ProductName / InternalName / OriginalFilename）
-          try {
-            $ver = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
-            $desc = $null
-            foreach ($field in @($ver.FileDescription, $ver.ProductName, $ver.InternalName, $ver.OriginalFilename)) {
-              if ($field -and $field.Length -ge 2 -and $field.Length -le 80 -and
-                  $field -notmatch '^\\{' -and $field -notmatch '[\\\\/:*?<>|]') {
-                $desc = $field
-                break
-              }
-            }
-            if ($desc) { return $desc }
-          } catch {}
-        }
-      }
-      # Level 3: CLSID 默认值
+      # Level 2: CLSID 默认值（与参考脚本 (default) 逻辑一致，可靠、ASCII-safe）
       $def = $clsidKey.GetValue('')
       if ($def -and $def.Length -ge 2) { return [string]$def }
     }
@@ -325,15 +307,7 @@ function Resolve-ExtName($clsid, $fallback) {
 }
 function Format-DisplayName($name) {
   if (-not $name) { return $name }
-  # 清理多余空格
-  $name = $name -replace '\s+', ' '
-  # 去除首尾空格
-  $name = $name.Trim()
-  # 规范化大小写（首字母大写）
-  if ($name.Length -gt 1) {
-    $name = $name.Substring(0,1).ToUpper() + $name.Substring(1).ToLower()
-  }
-  return $name
+  return $name.Trim()
 }
 $shellexPath = 'HKCR:\\${shellexSubPath}'
 if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }

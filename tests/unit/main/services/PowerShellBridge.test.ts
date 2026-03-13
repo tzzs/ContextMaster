@@ -82,6 +82,30 @@ describe('PowerShellBridge', () => {
       // 模板字面量中 \\ 在 PS 脚本里生成单个 \，所以检查单反斜杠路径
       expect(script).toContain('HKCR:\\*\\shell');
     });
+
+    it('Resolve-MenuName 不应包含热键清理 -replace（热键清理已移至 TS 层）', () => {
+      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+
+      // 提取 Resolve-MenuName 函数体，确认不含 -replace 热键正则
+      const fnMatch = script.match(/function Resolve-MenuName[\s\S]*?\n\}/);
+      expect(fnMatch).not.toBeNull();
+      const fnBody = fnMatch![0];
+      expect(fnBody).not.toContain('-replace');
+    });
+
+    it('名称检测链应包含 LocalizedDisplayName 作为第三优先级', () => {
+      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+
+      expect(script).toContain("GetValue('LocalizedDisplayName')");
+      // 顺序：MUIVerb → Default → LocalizedDisplayName → 键名
+      const muiIdx = script.indexOf("GetValue('MUIVerb')");
+      const defIdx = script.indexOf("GetValue('')");
+      const localIdx = script.indexOf("GetValue('LocalizedDisplayName')");
+      const fallbackIdx = script.indexOf('$name = $keyName');
+
+      expect(localIdx).toBeGreaterThan(defIdx);
+      expect(fallbackIdx).toBeGreaterThan(localIdx);
+    });
   });
 
   describe('buildGetShellExtItemsScript', () => {
@@ -104,32 +128,45 @@ describe('PowerShellBridge', () => {
       expect(script).not.toContain('ReadDllStrings');
     });
 
-    it('Level 2 应包含 InternalName 和 OriginalFilename', () => {
+    it('不应包含 DLL VersionInfo 字段（已移除 FileVersionInfo 级别）', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
-      expect(script).toContain('InternalName');
-      expect(script).toContain('OriginalFilename');
+      expect(script).not.toContain('InternalName');
+      expect(script).not.toContain('OriginalFilename');
+      expect(script).not.toContain('FileDescription');
+      expect(script).not.toContain('FileVersionInfo');
     });
 
-    it('Level 2 应以 foreach 遍历多个 VersionInfo 字段', () => {
+    it('不应以 foreach 遍历 VersionInfo 字段（DLL VersionInfo 已移除）', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
-      expect(script).toContain('foreach');
-      expect(script).toContain('FileDescription');
-      expect(script).toContain('ProductName');
+      expect(script).not.toContain('FileVersionInfo');
+      expect(script).not.toContain('ProductName');
     });
 
-    it('应将 CLSID Default 值作为 Level 3 兜底（而非 Level 4）', () => {
+    it('应将 CLSID Default 值作为 Level 2 兜底', () => {
       const script = bridge.buildGetShellExtItemsScript(
         'DesktopBackground\\shellex\\ContextMenuHandlers'
       );
 
-      expect(script).toContain('Level 3: CLSID 默认值');
-      expect(script).not.toContain('Level 4: CLSID');
+      expect(script).toContain('Level 2: CLSID 默认值');
+      expect(script).not.toContain('Level 3: CLSID');
+    });
+
+    it('Format-DisplayName 不应包含热键清理正则（热键清理已移至 TS 层）', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      // Format-DisplayName 函数体不应包含 -replace 热键正则
+      const fnMatch = script.match(/function Format-DisplayName[\s\S]*?\n\}/);
+      expect(fnMatch).not.toBeNull();
+      const fnBody = fnMatch![0];
+      expect(fnBody).not.toContain('-replace');
     });
 
     it('CmHelper 源码中不应包含 ReadDllStrings 方法', () => {

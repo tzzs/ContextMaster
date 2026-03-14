@@ -199,6 +199,27 @@ describe('PowerShellBridge', () => {
 
       expect(muiVerbIdx).toBeGreaterThan(localizedIdx);
       expect(level2Idx).toBeGreaterThan(muiVerbIdx);
+
+      // Level 1.5 MUIVerb 应调用 Test-IsGenericName 过滤
+      expect(script).toMatch(/Level 1\.5[\s\S]{0,600}Test-IsGenericName/);
+    });
+
+    it('Level 1.5 MUIVerb 和 Level 2 CLSID Default 应过滤泛型描述', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      // Level 1.5 MUIVerb 非间接分支调用 Test-IsGenericName
+      const level15Start = script.indexOf('Level 1.5:');
+      const level17Start = script.indexOf('Level 1.7:');
+      const muiVerbBlock = script.slice(level15Start, level17Start);
+      expect(muiVerbBlock).toContain('Test-IsGenericName');
+
+      // Level 2 Default 调用 Test-IsGenericName
+      const level2Start = script.indexOf('Level 2:');
+      const level25Start = script.indexOf('Level 2.5:');
+      const level2Block = script.slice(level2Start, level25Start);
+      expect(level2Block).toContain('Test-IsGenericName');
     });
 
     it('应读取 InprocServer32 DLL 路径并输出 dllPath 字段', () => {
@@ -290,6 +311,43 @@ describe('PowerShellBridge', () => {
       expect(script).toContain('$defaultVal');
       // command 字段应使用 $actualClsid，而非旧的 $clsid
       expect(script).toContain('command     = [string]$actualClsid');
+    });
+
+    it('应包含 Test-IsGenericName 函数定义，位于 Resolve-ExtName 之前', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      const testFnIdx    = script.indexOf('function Test-IsGenericName');
+      const resolveFnIdx = script.indexOf('function Resolve-ExtName');
+      expect(testFnIdx).toBeGreaterThan(0);
+      expect(resolveFnIdx).toBeGreaterThan(testFnIdx);
+    });
+
+    it('Test-IsGenericName 应包含 context\\s*menu、class 后缀和占位符过滤模式', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      const fnStart = script.indexOf('function Test-IsGenericName');
+      const fnEnd   = script.indexOf('function Resolve-ExtName');
+      const fnBody  = script.slice(fnStart, fnEnd);
+      expect(fnBody).toContain("context\\s*menu");   // Case 1: Quark AI Context Menu
+      expect(fnBody).toContain("\\s+class$");         // Case 2: PcyybContextnMenu Class
+      expect(fnBody).toContain("^todo:");              // Case 3: TODO: <File description>
+      expect(fnBody).toContain("<[^>]+>");             // Case 3: <placeholder>
+    });
+
+    it('Level 2.5 应调用 Test-IsGenericName 且保留长度上限 -le 64', () => {
+      const script = bridge.buildGetShellExtItemsScript(
+        'DesktopBackground\\shellex\\ContextMenuHandlers'
+      );
+
+      const level25Start = script.indexOf('Level 2.5:');
+      const level3Start  = script.indexOf('Level 3: directName');
+      const block = script.slice(level25Start, level3Start);
+      expect(block).toContain('Test-IsGenericName');
+      expect(block).toContain('-le 64');
     });
 
     it('InprocServer32 DLL FileDescription/ProductName 应作为 Level 2.5', () => {

@@ -1,6 +1,7 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerAppX } from '@electron-forge/maker-appx';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import path from 'path';
@@ -20,6 +21,18 @@ const config: ForgeConfig = {
       setupIcon: './assets/icon.ico',
     }),
     new MakerZIP({}, ['darwin']),
+    new MakerAppX({
+      publisher: 'CN=YourPublisherId',
+      packageName: 'ContextMaster',
+      packageDisplayName: 'ContextMaster',
+      packageDescription: 'Windows 右键菜单管理工具',
+      packageVersion: '1.0.0.0',
+      windowsKit: 'C:\\Program Files (x86)\\Windows Kits\\10\\bin\\x64',
+      manifest: './assets/Package.appxmanifest',
+      assets: './assets/store-icons',
+      deploy: false,
+      makePri: true,
+    }),
   ],
   plugins: [
     new AutoUnpackNativesPlugin({}),

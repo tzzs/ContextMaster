@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { initLogger } from './utils/logger';
+import { isRunningAsAdmin, showAdminPermissionDialog } from './utils/adminCheck';
 import { getDatabase, closeDatabase } from './data/Database';
 import { PowerShellBridge } from './services/PowerShellBridge';
 import { RegistryService } from './services/RegistryService';
@@ -72,6 +73,12 @@ function initServices(): void {
 
 app.whenReady().then(() => {
   initLogger();
+
+  if (!isRunningAsAdmin()) {
+    showAdminPermissionDialog();
+    return;
+  }
+
   initServices();
   createWindow();
 

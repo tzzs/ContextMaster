@@ -253,6 +253,27 @@ public class CmHelper {
     try { Add-Type -TypeDefinition $src -ErrorAction Stop; $helperLoaded = $true } catch {}
   }
 }
+function Test-IsGenericName($name) {
+  if (-not $name -or $name.Length -lt 2) { return $true }
+  $lc = $name.ToLower()
+  # Group A: COM/Shell 技术内部描述
+  if ($lc -match '外壳服务对象')                    { return $true }
+  if ($lc -match 'shell service object')            { return $true }
+  if ($lc -match 'shell\\s*(extension|ext|common)') { return $true }
+  if ($lc -match 'context\\s*menu')                 { return $true }
+  if ($lc -match 'ctx\\s*menu')                     { return $true }
+  if ($lc -match '\\bshell service')                { return $true }
+  if ($lc -match '\\bcom (object|server|class)')    { return $true }
+  if ($lc -match '\\.dll$')                         { return $true }
+  if ($lc -match '^microsoft windows')              { return $true }
+  # Group B: COM 类名后缀（新增）
+  if ($lc -match '\\s+class$')                      { return $true }
+  # Group C: 占位符/未完成文本（新增）
+  if ($lc -match '^todo:')                          { return $true }
+  if ($lc -match '<[^>]+>')                         { return $true }
+  if ($lc -match '^(n/a|na|none|unknown|untitled)$') { return $true }
+  return $false
+}
 function Resolve-ExtName($clsid, $fallback, $directName = $null) {
   # Level 0: directName（仅间接格式：@dll,-id 或 ms-resource:，最高本地化优先级）
   if ($directName -and ($directName.StartsWith('@') -or $directName.StartsWith('ms-resource:'))) {
@@ -276,12 +297,7 @@ function Resolve-ExtName($clsid, $fallback, $directName = $null) {
           } catch {}
         } elseif ($raw.Length -ge 2) {
           # 过滤泛型 COM 类型描述，这类值不适合作为菜单显示名
-          $lc = $raw.ToLower()
-          if ($lc -notmatch '外壳服务对象' -and
-              $lc -notmatch 'shell service object' -and
-              $lc -notmatch 'shell extension') {
-            return $raw
-          }
+          if (-not (Test-IsGenericName $raw)) { return $raw }
         }
       }
       # Level 1.5: MUIVerb（部分扩展如 gvim 通过此键注册显示名）
@@ -292,14 +308,18 @@ function Resolve-ExtName($clsid, $fallback, $directName = $null) {
             $resolved = [CmHelper]::ResolveIndirect($muiVerb)
             if ($resolved -and $resolved.Length -ge 2) { return $resolved }
           } catch {}
-        } elseif ($muiVerb.Length -ge 2) { return $muiVerb }
+        } elseif ($muiVerb.Length -ge 2) {
+          if (-not (Test-IsGenericName $muiVerb)) { return $muiVerb }
+        }
       }
       # Level 1.7: CommandStore 反向查找（ExplorerCommandHandler = $clsid → MUIVerb）
       # 适用于通过 ImplementsVerbs 注册但 CLSID 自身无本地化字段的 shell 扩展（如 Taskband Pin）
       if ($cmdStoreVerbs.ContainsKey($clsid)) { return $cmdStoreVerbs[$clsid] }
       # Level 2: CLSID 默认值（与参考脚本 (default) 逻辑一致，可靠、ASCII-safe）
       $def = $clsidKey.GetValue('')
-      if ($def -and $def.Length -ge 2) { return [string]$def }
+      if ($def -and $def.Length -ge 2) {
+        if (-not (Test-IsGenericName $def)) { return [string]$def }
+      }
     }
     # Level 2.5: InprocServer32 DLL FileDescription/ProductName
     # 适用于无本地化注册表字段的第三方扩展（如 YunShellExt → 阿里云盘）
@@ -313,17 +333,7 @@ function Resolve-ExtName($clsid, $fallback, $directName = $null) {
             $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllExp)
             foreach ($cand in @($vi.FileDescription, $vi.ProductName)) {
               if ($cand -and $cand.Length -ge 2 -and $cand.Length -le 64) {
-                $lc = $cand.ToLower()
-                if ($lc -notmatch 'shell\s*(extension|ext|common)' -and
-                    $lc -notmatch 'context\s*menu' -and
-                    $lc -notmatch 'ctx\s*menu' -and
-                    $lc -notmatch '外壳服务对象' -and
-                    $lc -notmatch '\bshell service' -and
-                    $lc -notmatch '\bcom (object|server|class)' -and
-                    $lc -notmatch '\.dll$' -and
-                    $lc -notmatch '^microsoft windows') {
-                  return $cand
-                }
+                if (-not (Test-IsGenericName $cand)) { return $cand }
               }
             }
           } catch {}
@@ -335,10 +345,7 @@ function Resolve-ExtName($clsid, $fallback, $directName = $null) {
   if ($directName -and
       -not $directName.StartsWith('@') -and
       -not $directName.StartsWith('ms-resource:')) {
-    $lc = $directName.ToLower()
-    if ($lc -notmatch '外壳服务对象' -and
-        $lc -notmatch 'shell service object' -and
-        $lc -notmatch 'shell extension') { return $directName }
+    if (-not (Test-IsGenericName $directName)) { return $directName }
   }
   return $fallback
 }

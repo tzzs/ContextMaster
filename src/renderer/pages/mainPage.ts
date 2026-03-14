@@ -29,6 +29,7 @@ let selectedItemId: number | null = null;
 let filterMode: 'all' | 'enabled' | 'disabled' = 'all';
 let loadingScene = false;
 let currentScene: MenuScene = MenuScene.Desktop;
+let pendingScene: MenuScene | null = null;
 
 export function refreshCurrentContent(): void {
   renderItems();
@@ -44,9 +45,13 @@ export function refreshCurrentContent(): void {
 registerRefreshCallback(refreshCurrentContent);
 
 export async function loadScene(scene: MenuScene): Promise<void> {
-  if (loadingScene) return;
+  if (loadingScene) {
+    pendingScene = scene;  // 记录最新请求，加载完后执行
+    return;
+  }
   loadingScene = true;
   currentScene = scene;
+  pendingScene = null;
 
   const listEl = document.getElementById('itemList');
   if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;
@@ -59,13 +64,19 @@ export async function loadScene(scene: MenuScene): Promise<void> {
 
   if (!result.success) {
     showError(`${t('main.loadFailed')}: ${result.error}`);
-    return;
+  } else {
+    currentItems = result.data;
+    updateSceneHeader(scene);
+    renderItems();
+    updateStatusBar(scene);
   }
 
-  currentItems = result.data;
-  updateSceneHeader(scene);
-  renderItems();
-  updateStatusBar(scene);
+  // 若加载期间有新的场景请求，执行最新的那个
+  if (pendingScene !== null) {
+    const next = pendingScene;
+    pendingScene = null;
+    await loadScene(next);
+  }
 }
 
 // ── 渲染条目列表 ──
@@ -201,9 +212,8 @@ export function showDetail(id: number): void {
     }
     return `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
   })();
-  const regCmdPath = isShellExt
-    ? `(COM DLL，CLSID: ${item.command})`
-    : `${regItemPath}\\command`;
+  const regCmdPath = `${regItemPath}\\command`;
+  // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
   const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const disabledNoteContent = isShellExt
@@ -267,10 +277,17 @@ export function showDetail(id: number): void {
       ${legacyNote}
     </div>
 
-    <div class="detail-field">
-      <div class="detail-field-label">${isShellExt ? t('item.comObject') : t('item.commandSubkey')}</div>
-      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    ${isShellExt ? `<div class="detail-field">
+      <div class="detail-field-label">COM 标识符</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.command)}</div>
     </div>
+    ${item.dllPath ? `<div class="detail-field">
+      <div class="detail-field-label">提供程序 DLL</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.dllPath)}</div>
+    </div>` : ''}` : `<div class="detail-field">
+      <div class="detail-field-label">命令子键路径</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    </div>`}
 
     <div class="detail-field">
       <div class="detail-field-label">${t('item.openInRegedit')}</div>
@@ -425,17 +442,31 @@ export function restoreSceneTitle(scene: MenuScene): void {
 // ── 预加载其余场景的 badge 数量 ──
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
   const allScenes = Object.values(MenuScene) as MenuScene[];
-  const scenesToLoad = allScenes.filter((s) => s !== skipScene);
-  
-  await Promise.all(
-    scenesToLoad.map(async (scene) => {
-      const result = await window.api.getMenuItems(scene);
-      const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) {
-        badgeEl.textContent = result.success ? String(result.data.length) : '?';
+  const targetScenes = allScenes.filter((scene) => scene !== skipScene);
+
+  // 并行加载所有场景的 badge 数量
+  const results = await Promise.all(
+    targetScenes.map(async (scene) => {
+      try {
+        const result = await window.api.getMenuItems(scene);
+        return { scene, result };
+      } catch (e) {
+        return { scene, result: { success: false, error: String(e) } };
       }
     })
   );
+
+  // 更新所有 badge
+  for (const { scene, result } of results) {
+    const badgeEl = document.getElementById(`badge-${scene}`);
+    if (!badgeEl) continue;
+
+    if (result.success && 'data' in result) {
+      badgeEl.textContent = String(result.data.length);
+    } else {
+      badgeEl.textContent = '?';
+    }
+  }
 }
 
 // 挂载到 window 供 HTML inline onclick 调用

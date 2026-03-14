@@ -10,6 +10,7 @@ vi.mock('@/main/services/RegistryService');
 vi.mock('@/main/services/OperationHistoryService');
 vi.mock('@/main/utils/logger', () => ({
   default: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -29,6 +30,7 @@ describe('MenuManagerService', () => {
       createRollbackPoint: vi.fn(),
       commitTransaction: vi.fn(),
       rollback: vi.fn(),
+      invalidateCache: vi.fn(),
     } as MockedObject<RegistryService>;
 
     mockHistory = {

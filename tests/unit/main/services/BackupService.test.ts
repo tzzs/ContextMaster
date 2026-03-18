@@ -106,10 +106,20 @@ describe('BackupService', () => {
   });
 
   describe('deleteBackup', () => {
-    it('should call repo delete with correct id', () => {
-      service.deleteBackup(123);
+    it('should call repo delete with correct id', async () => {
+      mockRepo.findById.mockReturnValue({
+        id: 123, name: 'Test', creationTime: '', type: BackupType.Manual, menuItemsJson: '[]', sha256Checksum: 'abc',
+      });
+
+      await service.deleteBackup(123);
 
       expect(mockRepo.delete).toHaveBeenCalledWith(123);
+    });
+
+    it('should throw when backup not found', async () => {
+      mockRepo.findById.mockReturnValue(null);
+
+      await expect(service.deleteBackup(999)).rejects.toThrow('备份快照不存在: id=999');
     });
   });
 

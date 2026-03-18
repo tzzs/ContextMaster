@@ -56,7 +56,7 @@ export class RegistryService {
    * 获取指定场景下的所有菜单条目（Classic Shell + Shell 扩展）
    * 优先从缓存读取，缓存未命中时执行 PowerShell 查询
    */
-  async getMenuItems(scene: MenuScene): Promise<MenuItemEntry[]> {
+  async getMenuItems(scene: MenuScene, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
     // 尝试从缓存读取
     const cached = this.cache.get(scene);
     if (cached) {
@@ -66,14 +66,14 @@ export class RegistryService {
 
     const basePath = SCENE_REGISTRY_PATHS[scene];
     const shellexPath = SCENE_SHELLEX_PATHS[scene];
-    
+
     try {
       // 并行读取 Classic Shell 命令 + Shell 扩展（COM ContextMenuHandlers）
       const script = this.ps.buildGetItemsScript(basePath);
       const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
       const [raw, shellexRaw] = await Promise.all([
-        this.ps.execute<PsMenuItemRaw[]>(script),
-        this.ps.execute<PsMenuItemRaw[]>(shellexScript).catch((e) => {
+        this.ps.execute<PsMenuItemRaw[]>(script, priority),
+        this.ps.execute<PsMenuItemRaw[]>(shellexScript, priority).catch((e) => {
           log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
           return [] as PsMenuItemRaw[];
         }),
@@ -149,13 +149,21 @@ export class RegistryService {
   async rollback(): Promise<void> {
     if (!this.inTransaction) return;
     log.warn('Rolling back registry changes...');
+    const failedItems: string[] = [];
     try {
       for (const [key, wasEnabled] of this.rollbackData) {
-        await this.setItemEnabledInternal(key, wasEnabled);
+        try {
+          await this.setItemEnabledInternal(key, wasEnabled);
+        } catch (e) {
+          failedItems.push(`${key}: ${String(e)}`);
+        }
       }
     } finally {
       this.inTransaction = false;
       this.rollbackData.clear();
+    }
+    if (failedItems.length > 0) {
+      throw new Error(`部分项回滚失败:\n${failedItems.join('\n')}`);
     }
   }
 

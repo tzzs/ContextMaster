@@ -13,32 +13,46 @@ const CACHE_TTL = 5 * 60 * 1000;
 
 export class MenuManagerService {
   private cache = new Map<MenuScene, CacheEntry>();
+  private inFlight = new Map<MenuScene, Promise<MenuItemEntry[]>>();
 
   constructor(
     private readonly registry: RegistryService,
     private readonly history: OperationHistoryService
   ) {}
 
-  async getMenuItems(scene: MenuScene, forceRefresh = false): Promise<MenuItemEntry[]> {
+  async getMenuItems(scene: MenuScene, forceRefresh = false, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
     if (!forceRefresh) {
       const cached = this.cache.get(scene);
       if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
         log.debug(`[MenuManager] Cache hit for scene: ${scene}`);
         return cached.items;
       }
+      const existing = this.inFlight.get(scene);
+      if (existing) {
+        log.debug(`[MenuManager] In-flight hit for scene: ${scene}`);
+        return existing;
+      }
     }
 
     log.debug(`[MenuManager] Loading items for scene: ${scene} (forceRefresh: ${forceRefresh})`);
     const start = Date.now();
-    const items = await this.registry.getMenuItems(scene);
-    const elapsed = Date.now() - start;
-    
-    if (elapsed > 100) {
-      log.info(`[MenuManager] Loaded ${items.length} items for ${scene} in ${elapsed}ms`);
-    }
+    const promise = this.registry.getMenuItems(scene, priority)
+      .then((items) => {
+        const elapsed = Date.now() - start;
+        if (elapsed > 100) {
+          log.info(`[MenuManager] Loaded ${items.length} items for ${scene} in ${elapsed}ms`);
+        }
+        this.cache.set(scene, { items, timestamp: Date.now() });
+        this.inFlight.delete(scene);
+        return items;
+      })
+      .catch((e) => {
+        this.inFlight.delete(scene);
+        throw e;
+      });
 
-    this.cache.set(scene, { items, timestamp: Date.now() });
-    return items;
+    this.inFlight.set(scene, promise);
+    return promise;
   }
 
   invalidateCache(scene?: MenuScene): void {
@@ -174,6 +188,22 @@ export class MenuManagerService {
       await this.registry.rollback();
       throw new Error(`批量禁用失败，已回滚: ${(e as Error).message}`);
     }
+  }
+
+  /**
+   * 后台预热所有场景（fire-and-forget，依赖 PowerShellBridge 信号量控制并发）
+   * 结果写入内存缓存，供后续 IPC 请求直接命中
+   */
+  async preloadAllScenes(): Promise<void> {
+    const scenes = Object.values(MenuScene) as MenuScene[];
+    await Promise.all(
+      scenes.map((scene) =>
+        this.getMenuItems(scene).catch((e) =>
+          log.warn(`[MenuManager] Preload failed for ${scene}:`, e)
+        )
+      )
+    );
+    log.info('[MenuManager] All scenes preloaded');
   }
 
   /**

@@ -25,11 +25,9 @@ export class BackupService {
 
   async createBackup(name: string, type = BackupType.Manual): Promise<BackupSnapshot> {
     const start = Date.now();
-    const allItems: MenuItemEntry[] = [];
-    for (const scene of Object.values(MenuScene)) {
-      const items = await this.menuManager.getMenuItems(scene);
-      allItems.push(...items);
-    }
+    const scenes = Object.values(MenuScene) as MenuScene[];
+    const itemsByScene = await Promise.all(scenes.map((s) => this.menuManager.getMenuItems(s)));
+    const allItems: MenuItemEntry[] = itemsByScene.flat();
 
     const jsonData = JSON.stringify(allItems);
     const checksum = createHash('sha256').update(jsonData).digest('hex');
@@ -95,8 +93,9 @@ export class BackupService {
 
   async deleteBackup(id: number): Promise<void> {
     const snapshot = this.repo.findById(id);
+    if (!snapshot) throw new Error(`备份快照不存在: id=${id}`);
     this.repo.delete(id);
-    log.warn(`[Backup] Deleted backup: id=${id}, name=${snapshot?.name ?? 'unknown'}`);
+    log.warn(`[Backup] Deleted backup: id=${id}, name=${snapshot.name}`);
   }
 
   getAllBackups(): BackupSnapshot[] {
@@ -155,6 +154,15 @@ export class BackupService {
 
     const filePath = filePaths[0];
     const jsonData = await fs.readFile(filePath, 'utf-8');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonData);
+    } catch {
+      throw new Error('导入文件不是有效的 JSON 格式');
+    }
+    if (!Array.isArray(parsed)) throw new Error('导入文件格式无效：必须是数组');
+
     const checksum = createHash('sha256').update(jsonData).digest('hex');
 
     const snapshot = this.repo.insert({

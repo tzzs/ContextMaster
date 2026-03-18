@@ -2,6 +2,7 @@ import '../api/bridge';
 import type { OperationRecord } from '../../shared/types';
 import { OperationType } from '../../shared/enums';
 import { t, registerRefreshCallback } from '../i18n';
+import { escapeHtml } from '../utils/html';
 
 function getOpLabel(type: OperationType): string {
   const opKeys: Record<OperationType, string> = {
@@ -125,10 +126,6 @@ function formatTime(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 const historyPageApi = { undoRecord, filterHistory, clearAllHistory };

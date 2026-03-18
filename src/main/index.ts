@@ -1,8 +1,10 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { initLogger } from './utils/logger';
+import log from './utils/logger';
 import { getDatabase, closeDatabase } from './data/Database';
 import { PowerShellBridge } from './services/PowerShellBridge';
+import { MenuScene } from '../shared/enums';
 import { RegistryService } from './services/RegistryService';
 import { OperationRecordRepo } from './data/repositories/OperationRecordRepo';
 import { BackupSnapshotRepo } from './data/repositories/BackupSnapshotRepo';
@@ -54,7 +56,7 @@ function createWindow(): void {
   }
 }
 
-function initServices(): void {
+function initServices(): MenuManagerService {
   const db = getDatabase();
   const ps = new PowerShellBridge();
   const registry = new RegistryService(ps);
@@ -68,12 +70,23 @@ function initServices(): void {
   registerHistoryHandlers(history, menuManager);
   registerBackupHandlers(backup);
   registerSystemHandlers();
+  return menuManager;
 }
 
 app.whenReady().then(() => {
   initLogger();
-  initServices();
+  const menuManager = initServices();
   createWindow();
+
+  // 串行预热：Desktop 优先，其余依次执行，避免饱和 PS 槽导致用户请求等待
+  void (async () => {
+    await menuManager.getMenuItems(MenuScene.Desktop).catch(e => log.warn('[Preload] Desktop failed:', e));
+    const rest = Object.values(MenuScene).filter(s => s !== MenuScene.Desktop) as MenuScene[];
+    for (const s of rest) {
+      await menuManager.getMenuItems(s).catch(() => null);
+    }
+    log.info('[Preload] All scenes preloaded');
+  })();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

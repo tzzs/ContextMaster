@@ -59,7 +59,7 @@ describe('MenuManagerService', () => {
 
       const result = await service.getMenuItems(MenuScene.Desktop);
 
-      expect(mockRegistry.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop);
+      expect(mockRegistry.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop, 'normal');
       expect(result).toEqual(mockItems);
     });
   });

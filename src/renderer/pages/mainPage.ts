@@ -2,6 +2,7 @@ import '../api/bridge';
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import type { MenuItemEntry, ToggleItemParams } from '../../shared/types';
 import { t, registerRefreshCallback } from '../i18n';
+import { escapeHtml } from '../utils/html';
 
 export const SCENE_REG_ROOTS: Record<MenuScene, string> = {
   [MenuScene.Desktop]:            'HKEY_CLASSES_ROOT\\DesktopBackground\\Shell',
@@ -29,6 +30,10 @@ let selectedItemId: number | null = null;
 let filterMode: 'all' | 'enabled' | 'disabled' = 'all';
 let loadingScene = false;
 let currentScene: MenuScene = MenuScene.Desktop;
+let pendingScene: MenuScene | null = null;
+
+const RENDERER_CACHE_TTL = 2 * 60 * 1000; // 2 分钟
+const rendererCache = new Map<MenuScene, { items: MenuItemEntry[]; timestamp: number }>();
 
 export function refreshCurrentContent(): void {
   renderItems();
@@ -43,13 +48,45 @@ export function refreshCurrentContent(): void {
 
 registerRefreshCallback(refreshCurrentContent);
 
-export async function loadScene(scene: MenuScene): Promise<void> {
-  if (loadingScene) return;
+export async function loadScene(scene: MenuScene, forceRefresh = false): Promise<void> {
+  if (loadingScene) {
+    pendingScene = scene;
+    // 立即更新 header 和导航高亮，表明请求已被接受
+    const titleEl = document.getElementById('sceneTitle');
+    if (titleEl) titleEl.innerHTML = `${getSceneName(scene)} <span class="loading-badge">…</span>`;
+    return;
+  }
   loadingScene = true;
   currentScene = scene;
+  pendingScene = null;
+
+  // 检查 Renderer 缓存（stale-while-revalidate）
+  if (!forceRefresh) {
+    const cached = rendererCache.get(scene);
+    if (cached && Date.now() - cached.timestamp < RENDERER_CACHE_TTL) {
+      console.debug(`[Renderer] cache hit: ${scene}`);
+      currentItems = cached.items;
+      selectedItemId = null;
+      resetDetailPanel();
+      updateSceneHeader(scene);
+      renderItems();
+      updateStatusBar(scene);
+      loadingScene = false;
+      // TTL 剩余不足 30s 时后台静默刷新，避免下次切换出现加载状态
+      if (Date.now() - cached.timestamp > RENDERER_CACHE_TTL - 30_000) {
+        void silentRefreshScene(scene);
+      }
+      if (pendingScene !== null) {
+        const next = pendingScene;
+        pendingScene = null;
+        await loadScene(next);
+      }
+      return;
+    }
+  }
 
   const listEl = document.getElementById('itemList');
-  if (listEl) listEl.innerHTML = `<div class="empty-state"><div>${t('main.loading')}</div></div>`;
+  if (listEl) listEl.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><span>${t('main.loading')}</span></div>`;
 
   selectedItemId = null;
   resetDetailPanel();
@@ -59,13 +96,27 @@ export async function loadScene(scene: MenuScene): Promise<void> {
 
   if (!result.success) {
     showError(`${t('main.loadFailed')}: ${result.error}`);
-    return;
+  } else {
+    currentItems = result.data;
+    rendererCache.set(scene, { items: result.data, timestamp: Date.now() });
+    updateSceneHeader(scene);
+    renderItems();
+    updateStatusBar(scene);
   }
 
-  currentItems = result.data;
-  updateSceneHeader(scene);
-  renderItems();
-  updateStatusBar(scene);
+  // 若加载期间有新的场景请求，执行最新的那个
+  if (pendingScene !== null) {
+    const next = pendingScene;
+    pendingScene = null;
+    await loadScene(next);
+  }
+}
+
+async function silentRefreshScene(scene: MenuScene): Promise<void> {
+  const result = await window.api.getMenuItems(scene);
+  if (result.success) {
+    rendererCache.set(scene, { items: result.data, timestamp: Date.now() });
+  }
 }
 
 // ── 渲染条目列表 ──
@@ -173,6 +224,8 @@ export async function toggleItem(id: number): Promise<void> {
   if (result.data.newRegistryKey) {
     item.registryKey = result.data.newRegistryKey;
   }
+  // toggle 后使该场景的 renderer 缓存失效，确保下次切回时拿到最新状态
+  rendererCache.delete(item.menuScene);
   renderItems();
   const action = item.isEnabled ? t('history.operation.enable') : t('history.operation.disable');
   (window as Window & { showUndo?: (msg: string, itemId: number) => void; invalidateAllScenesCache?: () => void })
@@ -201,9 +254,8 @@ export function showDetail(id: number): void {
     }
     return `${SCENE_REG_ROOTS[item.menuScene]}\\${item.registryKey.split('\\').pop()}`;
   })();
-  const regCmdPath = isShellExt
-    ? `(COM DLL，CLSID: ${item.command})`
-    : `${regItemPath}\\command`;
+  const regCmdPath = `${regItemPath}\\command`;
+  // 在 HTML onclick 属性里，反斜杠会被 JS 当转义前缀消耗，必须双写
   const regItemPathAttr = regItemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
   const disabledNoteContent = isShellExt
@@ -267,10 +319,17 @@ export function showDetail(id: number): void {
       ${legacyNote}
     </div>
 
-    <div class="detail-field">
-      <div class="detail-field-label">${isShellExt ? t('item.comObject') : t('item.commandSubkey')}</div>
-      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    ${isShellExt ? `<div class="detail-field">
+      <div class="detail-field-label">COM 标识符</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.command)}</div>
     </div>
+    ${item.dllPath ? `<div class="detail-field">
+      <div class="detail-field-label">提供程序 DLL</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(item.dllPath)}</div>
+    </div>` : ''}` : `<div class="detail-field">
+      <div class="detail-field-label">命令子键路径</div>
+      <div class="detail-field-value mono" style="word-break:break-all;line-height:1.6;color:var(--text3);">${escapeHtml(regCmdPath)}</div>
+    </div>`}
 
     <div class="detail-field">
       <div class="detail-field-label">${t('item.openInRegedit')}</div>
@@ -367,14 +426,6 @@ function showOperationError(msg: string): void {
   }, 3000);
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-}
-
 // ── 从详情面板触发切换 ──
 export async function toggleFromDetail(): Promise<void> {
   if (selectedItemId == null) return;
@@ -422,21 +473,42 @@ export function restoreSceneTitle(scene: MenuScene): void {
   resetDetailPanel();
 }
 
-// ── 预加载其余场景的 badge 数量 ──
+// ── 预加载其余场景的 badge 数量（串行，每个场景完成后立即更新，渐进显示）──
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
   const allScenes = Object.values(MenuScene) as MenuScene[];
-  const scenesToLoad = allScenes.filter((s) => s !== skipScene);
-  
-  await Promise.all(
-    scenesToLoad.map(async (scene) => {
-      const result = await window.api.getMenuItems(scene);
-      const badgeEl = document.getElementById(`badge-${scene}`);
-      if (badgeEl) {
-        badgeEl.textContent = result.success ? String(result.data.length) : '?';
-      }
-    })
-  );
+  const targetScenes = allScenes.filter((scene) => scene !== skipScene);
+
+  for (const scene of targetScenes) {
+    const result = await window.api.getMenuItems(scene).catch(() => null);
+    const badgeEl = document.getElementById(`badge-${scene}`);
+    if (!badgeEl) continue;
+
+    if (result && result.success && 'data' in result) {
+      badgeEl.textContent = String(result.data.length);
+      rendererCache.set(scene, { items: result.data, timestamp: Date.now() });
+    } else {
+      badgeEl.textContent = '?';
+    }
+  }
 }
+
+export function onNavigateAway(): void {
+  pendingScene = null;  // 取消挂起的场景切换请求，避免导航离开后触发残留副作用
+}
+
+// ── 注入 loading spinner 样式 ──
+(function injectSpinnerStyles() {
+  if (document.getElementById('_cmSpinnerStyles')) return;
+  const style = document.createElement('style');
+  style.id = '_cmSpinnerStyles';
+  style.textContent = `
+.loading-state { display:flex; align-items:center; justify-content:center; height:200px; gap:10px; color:var(--text3); }
+.loading-spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:cmSpin 0.7s linear infinite; flex-shrink:0; }
+@keyframes cmSpin { to { transform:rotate(360deg); } }
+.loading-badge { font-size:11px; color:var(--text3); font-weight:normal; }
+  `.trim();
+  document.head.appendChild(style);
+})();
 
 // 挂载到 window 供 HTML inline onclick 调用
 const mainPageApi = { selectItem, toggleItem, setFilter, flashCopyBtn, toggleFromDetail, deleteSelected };

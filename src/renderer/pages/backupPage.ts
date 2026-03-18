@@ -2,6 +2,7 @@ import '../api/bridge';
 import type { BackupSnapshot } from '../../shared/types';
 import { BackupType } from '../../shared/enums';
 import { t, registerRefreshCallback } from '../i18n';
+import { escapeHtml } from '../utils/html';
 
 let backups: BackupSnapshot[] = [];
 
@@ -157,10 +158,6 @@ function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString('zh-CN').replace(/\//g, '-');
   } catch { return iso; }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 const backupPageApi = { createBackup, restoreBackup, exportBackup, importBackup, deleteBackup };

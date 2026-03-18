@@ -11,7 +11,7 @@ export function registerRegistryHandlers(menuManager: MenuManagerService): void 
     IPC.REGISTRY_GET_ITEMS,
     wrapHandler((_event: unknown, scene: MenuScene) => {
       log.debug(`[Registry] Getting items for scene: ${scene}`);
-      return menuManager.getMenuItems(scene);
+      return menuManager.getMenuItems(scene, false, 'high');
     })
   );
 

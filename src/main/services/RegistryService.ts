@@ -131,7 +131,7 @@ export class RegistryService {
       for (let i = 0; i < shellexEntries.length; i++) {
         const entry = shellexEntries[i];
         const raw = shellexItems[i];
-        log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" clsidMUI="${raw.clsidMUIVerb || ''}" dllDesc="${raw.dllFileDescription || ''}" dllProd="${raw.dllProductName || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
+        log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" clsidMUI="${raw.clsidMUIVerb || ''}" progId="${raw.progIdName || ''}" dllDesc="${raw.dllFileDescription || ''}" dllProd="${raw.dllProductName || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
       }
 
       // 写入缓存

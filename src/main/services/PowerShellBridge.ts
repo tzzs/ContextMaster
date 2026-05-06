@@ -276,6 +276,15 @@ $result = @($handlers | ForEach-Object {
         $dllRaw = (Get-Item -LiteralPath $inprocPath).GetValue('')
         if ($dllRaw) { $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllRaw) }
       }
+      # ProgID → 应用程序名（用于 Level 1.6）
+      $progIdVal = $clsidKey.GetValue('ProgID')
+      if ($progIdVal) {
+        $progIdPath = 'HKCR:\' + $progIdVal
+        if (Test-Path -LiteralPath $progIdPath) {
+          $progIdDef = (Get-Item -LiteralPath $progIdPath).GetValue('')
+          if ($progIdDef -and $progIdDef.Length -ge 2) { $progIdName = [string]$progIdDef }
+        }
+      }
     }
   }
   # DLL 版本资源（.NET FileVersionInfo，天然支持 UI 语言，无需 koffi）
@@ -315,6 +324,7 @@ $result = @($handlers | ForEach-Object {
     dllPath              = $dllPath
     dllFileDescription   = $dllFileDescription
     dllProductName       = $dllProductName
+    progIdName           = $progIdName
     siblingMUIVerb       = $siblingMUIVerb
     registryKey          = [string]$regKey
   }

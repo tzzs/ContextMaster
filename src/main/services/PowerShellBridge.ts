@@ -278,13 +278,17 @@ $result = @($handlers | ForEach-Object {
       }
     }
   }
-  # DLL FileDescription（.NET FileVersionInfo，天然支持 UI 语言，无需 koffi）
+  # DLL 版本资源（.NET FileVersionInfo，天然支持 UI 语言，无需 koffi）
   $dllFileDescription = $null
+  $dllProductName = $null
   if ($dllPath -and (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
     try {
       $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
       if ($vi.FileDescription -and $vi.FileDescription.Length -ge 2) {
         $dllFileDescription = [string]$vi.FileDescription
+      }
+      if ($vi.ProductName -and $vi.ProductName.Length -ge 2) {
+        $dllProductName = [string]$vi.ProductName
       }
     } catch {}
   }
@@ -310,6 +314,7 @@ $result = @($handlers | ForEach-Object {
     clsidDefault         = $clsidDefault
     dllPath              = $dllPath
     dllFileDescription   = $dllFileDescription
+    dllProductName       = $dllProductName
     siblingMUIVerb       = $siblingMUIVerb
     registryKey          = [string]$regKey
   }

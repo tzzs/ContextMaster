@@ -40,6 +40,7 @@ function createShellExtItem(overrides: Partial<PsRawShellExtItem> = {}): PsRawSh
     clsidDefault: null,
     dllPath: null,
     dllFileDescription: null,
+    dllProductName: null,
     siblingMUIVerb: null,
     registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\TestExt',
     ...overrides,

@@ -40,6 +40,18 @@ const STANDARD_VERBS: Record<string, { zh: string; en: string }> = {
   'unpintotaskbar':  { zh: '从任务栏取消固定',   en: 'Unpin from taskbar' },
   'pinToStart':      { zh: '固定到"开始"屏幕',  en: 'Pin to Start' },
   'unpinFromStart':  { zh: '从"开始"屏幕取消固定', en: 'Unpin from Start' },
+
+  // CLSID Default 英文名 → 中文翻译（常见系统/第三方 Shell 扩展）
+  'start menu pin':                     { zh: '固定到"开始"屏幕',     en: 'Start Menu Pin' },
+  'taskband pin':                       { zh: '固定到任务栏',         en: 'Taskband Pin' },
+  'open with context menu handler':     { zh: '打开方式',             en: 'Open With Context Menu Handler' },
+  'encryption context menu':            { zh: '加密菜单',             en: 'Encryption Context Menu' },
+  'shell extensions for sharing':       { zh: '共享',                 en: 'Shell extensions for sharing' },
+  'new menu handler':                   { zh: '新建菜单',             en: 'New Menu Handler' },
+  'previous versions property page':    { zh: '以前的版本',           en: 'Previous Versions Property Page' },
+  'work folders context menu handler':  { zh: '工作文件夹',           en: 'Work Folders Context Menu Handler' },
+  'shellex for cd burning':             { zh: '刻录到光盘',           en: 'ShellFolder for CD Burning' },
+  'doubao context menu':                { zh: '豆包右键菜单',         en: 'Doubao Context Menu' },
 };
 
 // ---- 数据契约：PS 脚本返回的原始数据 ----
@@ -278,9 +290,14 @@ export class ShellExtNameResolver {
         }
       }
 
-      // Level 2: CLSID 默认值
+      // Level 2: CLSID 默认值（尝试翻译已知英文名）
       if (raw.clsidDefault && raw.clsidDefault.length >= 2) {
         if (!isUselessPlain(raw.clsidDefault, fallback)) {
+          const translated = translateStandardVerb(raw.clsidDefault, this.language);
+          if (translated) {
+            log.debug(`[NameResolver] ${fallback} → Level 2 (CLSID Default translated): "${translated}"`);
+            return translated;
+          }
           log.debug(`[NameResolver] ${fallback} → Level 2 (CLSID Default): "${raw.clsidDefault}"`);
           return raw.clsidDefault;
         }

@@ -3,4 +3,5 @@ onlyBuiltDependencies:
   - electron
   - electron-winstaller
   - esbuild
+  - koffi
   - lzma-native

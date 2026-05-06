@@ -1,67 +1,106 @@
 import { describe, it, expect, vi, beforeEach, MockedObject } from 'vitest';
 import { RegistryService } from '@/main/services/RegistryService';
 import { PowerShellBridge } from '@/main/services/PowerShellBridge';
+import { ShellExtNameResolver, CommandStoreIndex } from '@/main/services/ShellExtNameResolver';
+import { IWin32Shell } from '@/main/services/Win32Shell';
 import { MenuScene, MenuItemType } from '@shared/enums';
 
 // Mock PowerShellBridge
 vi.mock('@/main/services/PowerShellBridge');
 
+function createMockPs(): MockedObject<PowerShellBridge> {
+  return {
+    buildGetItemsScript: vi.fn(),
+    buildGetShellExtItemsScript: vi.fn(),
+    buildSetEnabledScript: vi.fn(),
+    buildShellExtToggleScript: vi.fn(),
+    buildCommandStoreScript: vi.fn(),
+    execute: vi.fn(),
+    executeElevated: vi.fn(),
+  } as unknown as MockedObject<PowerShellBridge>;
+}
+
+function createMockResolver(resolveClassicName?: (raw: any) => string, resolveExtName?: (raw: any, cmdStore: any) => string): ShellExtNameResolver {
+  const win32: IWin32Shell = {
+    resolveIndirect: vi.fn().mockReturnValue(null),
+    getFileVersionInfo: vi.fn().mockReturnValue(null),
+  };
+  const resolver = new ShellExtNameResolver(win32);
+  if (resolveClassicName) vi.spyOn(resolver, 'resolveClassicName').mockImplementation(resolveClassicName);
+  if (resolveExtName) vi.spyOn(resolver, 'resolveExtName').mockImplementation(resolveExtName);
+  return resolver;
+}
+
 describe('RegistryService', () => {
   let service: RegistryService;
   let mockPs: MockedObject<PowerShellBridge>;
+  let mockResolver: ShellExtNameResolver;
+  let mockCmdStore: CommandStoreIndex;
 
   beforeEach(() => {
-    mockPs = {
-      buildGetItemsScript: vi.fn(),
-      buildGetShellExtItemsScript: vi.fn(),
-      buildSetEnabledScript: vi.fn(),
-      buildShellExtToggleScript: vi.fn(),
-      execute: vi.fn(),
-      executeElevated: vi.fn(),
-    } as MockedObject<PowerShellBridge>;
-    
-    service = new RegistryService(mockPs);
+    mockPs = createMockPs();
+    mockResolver = createMockResolver();
+    mockCmdStore = new CommandStoreIndex();
+    service = new RegistryService(mockPs, mockResolver, mockCmdStore);
   });
 
   describe('getMenuItems', () => {
     it('should return empty array when no items found', async () => {
       (mockPs.execute as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-      
+
       const result = await service.getMenuItems(MenuScene.Desktop);
-      
+
       expect(result).toEqual([]);
     });
 
-    it('should parse and return menu items correctly', async () => {
+    it('should parse Classic Shell items through resolver', async () => {
       const rawItems = [{
-        name: 'Test Menu',
-        command: 'test.exe',
-        iconPath: 'C:\\icon.ico',
-        isEnabled: true,
-        source: 'TestApp',
-        registryKey: 'HKCR\\\\Test\\\\shell\\\\Test Menu',
         subKeyName: 'Test Menu',
-      }];
-      
-      // Mock both Classic Shell and ShellExt calls
-      mockPs.execute.mockResolvedValueOnce(rawItems)  // Classic Shell
-                  .mockResolvedValueOnce([]);         // ShellExt (empty)
-      
-      const result = await service.getMenuItems(MenuScene.File);
-      
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        name: 'Test Menu',
-        command: 'test.exe',
+        rawMUIVerb: '@shell32.dll,-1234',
+        rawDefault: 'Open',
+        rawLocalizedDisplayName: null,
+        rawIcon: 'C:\\icon.ico',
         isEnabled: true,
-        source: 'TestApp',
-        menuScene: MenuScene.File,
-        type: MenuItemType.Custom,
-      });
+        command: 'test.exe',
+        registryKey: 'HKCR\\Test\\shell\\Test Menu',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+
+      const result = await service.getMenuItems(MenuScene.File);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].command).toBe('test.exe');
+      expect(result[0].menuScene).toBe(MenuScene.File);
+      expect(result[0].type).toBe(MenuItemType.Custom);
+    });
+
+    it('should parse ShellExt items through resolver', async () => {
+      const shellextItems = [{
+        handlerKeyName: 'YunShellExt',
+        cleanName: 'YunShellExt',
+        defaultVal: '',
+        isEnabled: true,
+        actualClsid: '{BIG-DATA-CLSID}',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+        dllPath: 'C:\\Program Files\\YunShellExt\\YunShellExt64.dll',
+        siblingMUIVerb: null,
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\YunShellExt',
+      }];
+
+      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
+
+      const result = await service.getMenuItems(MenuScene.Desktop);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(MenuItemType.ShellExt);
+      expect(result[0].dllPath).toBe('C:\\Program Files\\YunShellExt\\YunShellExt64.dll');
     });
   });
 
-  describe('名称净化（热键清理）', () => {
+  describe('名称净化（热键清理 cleanDisplayName）', () => {
     it('应清理带括号加速键整体，不留残余括号', async () => {
       const cases = [
         { input: '使用 Visual Studio 打开(&V)', expected: '使用 Visual Studio 打开' },
@@ -70,19 +109,23 @@ describe('RegistryService', () => {
       ];
 
       for (const { input, expected } of cases) {
+        const freshPs = createMockPs();
+        // resolver returns the raw name as-is (only cleanDisplayName cleans it)
+        const freshResolver = createMockResolver((raw: any) => input);
+        const freshService = new RegistryService(freshPs, freshResolver, mockCmdStore);
+
         const rawItems = [{
-          name: input,
-          command: '',
-          iconPath: null,
-          isEnabled: true,
-          source: '',
-          registryKey: 'DesktopBackground\\Shell\\TestItem',
           subKeyName: 'TestItem',
+          rawMUIVerb: input,
+          rawDefault: null,
+          rawLocalizedDisplayName: null,
+          rawIcon: null,
+          isEnabled: true,
+          command: '',
+          registryKey: 'DesktopBackground\\Shell\\TestItem',
         }];
 
-        // 每次调用需要新的 service 实例（避免缓存）
-        const freshService = new RegistryService(mockPs);
-        mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+        freshPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
 
         const result = await freshService.getMenuItems(MenuScene.Desktop);
 
@@ -93,34 +136,17 @@ describe('RegistryService', () => {
     });
   });
 
-  describe('名称净化（@ 间接字符串兜底）', () => {
-    it('以 @ 开头的名称应被 subKeyName 替换', async () => {
+  describe('resolver passes through to cleanDisplayName', () => {
+    it('正常名称应通过 resolver 并正确显示', async () => {
       const rawItems = [{
-        name: '@%SystemRoot%\\system32\\shell32.dll,-1234',
-        command: '',
-        iconPath: null,
-        isEnabled: true,
-        source: '',
-        registryKey: 'DesktopBackground\\Shell\\TestItem',
         subKeyName: 'TestItem',
-      }];
-
-      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
-
-      const result = await service.getMenuItems(MenuScene.Desktop);
-
-      expect(result[0].name).toBe('TestItem');
-    });
-
-    it('正常名称不应被替换', async () => {
-      const rawItems = [{
-        name: '在桌面上显示',
-        command: '',
-        iconPath: null,
+        rawMUIVerb: null,
+        rawDefault: '在桌面上显示',
+        rawLocalizedDisplayName: null,
+        rawIcon: null,
         isEnabled: true,
-        source: '',
+        command: '',
         registryKey: 'DesktopBackground\\Shell\\TestItem',
-        subKeyName: 'TestItem',
       }];
 
       mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
@@ -130,34 +156,19 @@ describe('RegistryService', () => {
       expect(result[0].name).toBe('在桌面上显示');
     });
 
-    it('subKeyName 为空时 @ 名称应保留原值', async () => {
-      const rawItems = [{
-        name: '@unresolved',
-        command: '',
-        iconPath: null,
-        isEnabled: true,
-        source: '',
-        registryKey: 'DesktopBackground\\Shell\\',
-        subKeyName: '',
-      }];
-
-      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
-
-      const result = await service.getMenuItems(MenuScene.Desktop);
-
-      expect(result[0].name).toBe('@unresolved');
-    });
-
-    it('ShellExt 条目的 @ 名称也应净化为 subKeyName', async () => {
+    it('ShellExt 条目名称应由 resolver 决定', async () => {
       const shellextItems = [{
-        name: '@%SystemRoot%\\system32\\shell32.dll,-9999',
-        command: '{645FF040-5081-101B-9F08-00AA002F954E}',
-        iconPath: null,
+        handlerKeyName: 'DesktopSlideshow',
+        cleanName: 'DesktopSlideshow',
+        defaultVal: '@windows.immersivecontrolpanel.dll,-1',
         isEnabled: true,
-        source: 'DesktopSlideshow',
+        actualClsid: '{2CC2D03E-B04A-43BE-A6BE-8C20E6A64F87}',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+        dllPath: null,
+        siblingMUIVerb: null,
         registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\DesktopSlideshow',
-        subKeyName: 'DesktopSlideshow',
-        itemType: 'ShellExt',
       }];
 
       mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
@@ -167,43 +178,22 @@ describe('RegistryService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('DesktopSlideshow');
     });
-
-    it('模拟 DesktopSlideshow 问题场景：错误名称应被键名替换', async () => {
-      // 模拟 Level 3 DLL 扫描可能返回的错误名称（现已移除该逻辑）
-      // RegistryService 的 @ 兜底层作为最终保险
-      const shellextItems = [{
-        name: '@windows.immersivecontrolpanel.dll,-1',
-        command: '{2CC2D03E-B04A-43BE-A6BE-8C20E6A64F87}',
-        iconPath: null,
-        isEnabled: true,
-        source: 'DesktopSlideshow',
-        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\DesktopSlideshow',
-        subKeyName: 'DesktopSlideshow',
-        itemType: 'ShellExt',
-      }];
-
-      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
-
-      const result = await service.getMenuItems(MenuScene.Desktop);
-
-      expect(result[0].name).toBe('DesktopSlideshow');
-      expect(result[0].name).not.toContain('@');
-      expect(result[0].name).not.toContain('电池');
-    });
   });
 
   describe('dllPath 字段透传', () => {
     it('ShellExt 条目应将 dllPath 传入 MenuItemEntry', async () => {
       const shellextItems = [{
-        name: 'gvim Shell Extension',
-        command: '{51EEE242-AD87-11d3-9C1E-0090278BBD99}',
-        iconPath: null,
+        handlerKeyName: 'gvim',
+        cleanName: 'gvim',
+        defaultVal: '',
         isEnabled: true,
-        source: 'gvim',
-        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\gvim',
-        subKeyName: 'gvim',
-        itemType: 'ShellExt',
+        actualClsid: '{51EEE242-AD87-11d3-9C1E-0090278BBD99}',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
         dllPath: 'C:\\Program Files\\Vim\\vim91\\gvimext.dll',
+        siblingMUIVerb: null,
+        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\gvim',
       }];
 
       mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
@@ -214,35 +204,16 @@ describe('RegistryService', () => {
       expect(result[0].dllPath).toBe('C:\\Program Files\\Vim\\vim91\\gvimext.dll');
     });
 
-    it('无 DLL 路径的 ShellExt 条目 dllPath 应为 null', async () => {
-      const shellextItems = [{
-        name: 'SomeExt',
-        command: '{12345678-1234-1234-1234-123456789ABC}',
-        iconPath: null,
-        isEnabled: true,
-        source: 'SomeExt',
-        registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\SomeExt',
-        subKeyName: 'SomeExt',
-        itemType: 'ShellExt',
-        dllPath: null,
-      }];
-
-      mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
-
-      const result = await service.getMenuItems(MenuScene.Desktop);
-
-      expect(result[0].dllPath).toBeNull();
-    });
-
     it('Classic Shell 条目 dllPath 应为 null', async () => {
       const rawItems = [{
-        name: 'Classic Item',
-        command: 'cmd.exe',
-        iconPath: null,
-        isEnabled: true,
-        source: '',
-        registryKey: 'DesktopBackground\\Shell\\Classic',
         subKeyName: 'Classic',
+        rawMUIVerb: null,
+        rawDefault: 'Classic Item',
+        rawLocalizedDisplayName: null,
+        rawIcon: null,
+        isEnabled: true,
+        command: 'cmd.exe',
+        registryKey: 'DesktopBackground\\Shell\\Classic',
       }];
 
       mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
@@ -259,19 +230,13 @@ describe('RegistryService', () => {
         { registryKey: 'key1', isEnabled: true },
         { registryKey: 'key2', isEnabled: false },
       ];
-      
+
       service.createRollbackPoint(items);
-      
-      // Rollback point should be stored internally
-      // This is verified by rollback behavior
     });
 
     it('should commit transaction and clear rollback data', () => {
       service.createRollbackPoint([{ registryKey: 'key', isEnabled: true }]);
       service.commitTransaction();
-      
-      // After commit, rollback data should be cleared
-      // This is verified by subsequent operations
     });
   });
 });

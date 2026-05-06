@@ -6,6 +6,8 @@ import { getDatabase, closeDatabase } from './data/Database';
 import { PowerShellBridge } from './services/PowerShellBridge';
 import { MenuScene } from '../shared/enums';
 import { RegistryService } from './services/RegistryService';
+import { ShellExtNameResolver, CommandStoreIndex } from './services/ShellExtNameResolver';
+import { Win32Shell } from './services/Win32Shell';
 import { OperationRecordRepo } from './data/repositories/OperationRecordRepo';
 import { BackupSnapshotRepo } from './data/repositories/BackupSnapshotRepo';
 import { OperationHistoryService } from './services/OperationHistoryService';
@@ -59,12 +61,23 @@ function createWindow(): void {
 function initServices(): MenuManagerService {
   const db = getDatabase();
   const ps = new PowerShellBridge();
-  const registry = new RegistryService(ps);
+  const win32Shell = new Win32Shell();
+  const resolver = new ShellExtNameResolver(win32Shell);
+  const cmdStoreIndex = new CommandStoreIndex();
+  const registry = new RegistryService(ps, resolver, cmdStoreIndex);
   const opRepo = new OperationRecordRepo(db);
   const bkRepo = new BackupSnapshotRepo(db);
   const history = new OperationHistoryService(opRepo);
   const menuManager = new MenuManagerService(registry, history);
   const backup = new BackupService(bkRepo, menuManager, history);
+
+  // 异步构建 CommandStore 索引（不阻塞启动）
+  ps.execute<Array<{ clsid: string; muiverb: string }>>(ps.buildCommandStoreScript())
+    .then(entries => {
+      cmdStoreIndex.buildFromData(entries);
+      log.info(`[Init] CommandStore index built: ${entries.length} entries`);
+    })
+    .catch(e => log.warn('[Init] CommandStore index build failed:', e));
 
   registerRegistryHandlers(menuManager);
   registerHistoryHandlers(history, menuManager);

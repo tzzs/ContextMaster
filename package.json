@@ -22,7 +22,8 @@
     "better-sqlite3": "^11.0.0",
     "electron-log": "^5.2.0",
     "i18next": "^25.8.18",
-    "i18next-http-backend": "^3.0.2"
+    "i18next-http-backend": "^3.0.2",
+    "koffi": "^2.16.1"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.6.0",

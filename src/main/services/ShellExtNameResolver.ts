@@ -189,66 +189,47 @@ export class ShellExtNameResolver {
       } catch { /* fall through */ }
     }
 
-    // 以下 Level 需 CLSID 路径存在
+    // ====== Phase A: 间接格式优先（resolveIndirect 返回系统语言名称） ======
     if (raw.actualClsid) {
-      // Level 1: CLSID.LocalizedString
-      if (raw.clsidLocalizedString) {
-        if (raw.clsidLocalizedString.startsWith('@') || raw.clsidLocalizedString.startsWith('ms-resource:')) {
-          try {
-            const resolved = this.win32.resolveIndirect(raw.clsidLocalizedString);
-            if (resolved && resolved.length >= 2) {
-              log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString indirect): "${resolved}"`);
-              return resolved;
-            }
-          } catch { /* fall through */ }
-        } else if (raw.clsidLocalizedString.length >= 2) {
-          if (!isUselessPlain(raw.clsidLocalizedString, fallback)) {
-            log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString plain): "${raw.clsidLocalizedString}"`);
-            return raw.clsidLocalizedString;
+      // Level 1-indirect: CLSID.LocalizedString @/ms-resource: 格式
+      if (raw.clsidLocalizedString &&
+          (raw.clsidLocalizedString.startsWith('@') || raw.clsidLocalizedString.startsWith('ms-resource:'))) {
+        try {
+          const resolved = this.win32.resolveIndirect(raw.clsidLocalizedString);
+          if (resolved && resolved.length >= 2) {
+            log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString indirect): "${resolved}"`);
+            return resolved;
           }
-        }
+        } catch { /* fall through */ }
       }
 
-      // Level 1.3: Sibling Shell Key MUIVerb
-      if (raw.siblingMUIVerb) {
-        if (raw.siblingMUIVerb.startsWith('@') || raw.siblingMUIVerb.startsWith('ms-resource:')) {
-          try {
-            const resolved = this.win32.resolveIndirect(raw.siblingMUIVerb);
-            if (resolved && resolved.length >= 2) {
-              log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb indirect): "${resolved}"`);
-              return resolved;
-            }
-          } catch { /* fall through */ }
-        } else if (raw.siblingMUIVerb.length >= 2) {
-          if (!isUselessPlain(raw.siblingMUIVerb, fallback)) {
-            log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb): "${raw.siblingMUIVerb}"`);
-            return raw.siblingMUIVerb;
+      // Level 1.3-indirect: Sibling Shell Key MUIVerb @/ms-resource: 格式
+      if (raw.siblingMUIVerb &&
+          (raw.siblingMUIVerb.startsWith('@') || raw.siblingMUIVerb.startsWith('ms-resource:'))) {
+        try {
+          const resolved = this.win32.resolveIndirect(raw.siblingMUIVerb);
+          if (resolved && resolved.length >= 2) {
+            log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb indirect): "${resolved}"`);
+            return resolved;
           }
-        }
+        } catch { /* fall through */ }
       }
 
-      // Level 1.5: CLSID.MUIVerb
-      if (raw.clsidMUIVerb) {
-        if (raw.clsidMUIVerb.startsWith('@') || raw.clsidMUIVerb.startsWith('ms-resource:')) {
-          try {
-            const resolved = this.win32.resolveIndirect(raw.clsidMUIVerb);
-            if (resolved && resolved.length >= 2) {
-              log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb indirect): "${resolved}"`);
-              return resolved;
-            }
-          } catch { /* fall through */ }
-        } else if (raw.clsidMUIVerb.length >= 2) {
-          if (!isUselessPlain(raw.clsidMUIVerb, fallback)) {
-            log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb): "${raw.clsidMUIVerb}"`);
-            return raw.clsidMUIVerb;
+      // Level 1.5-indirect: CLSID.MUIVerb @/ms-resource: 格式
+      if (raw.clsidMUIVerb &&
+          (raw.clsidMUIVerb.startsWith('@') || raw.clsidMUIVerb.startsWith('ms-resource:'))) {
+        try {
+          const resolved = this.win32.resolveIndirect(raw.clsidMUIVerb);
+          if (resolved && resolved.length >= 2) {
+            log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb indirect): "${resolved}"`);
+            return resolved;
           }
-        }
+        } catch { /* fall through */ }
       }
 
-      // Level 1.7: CommandStore 反向索引
+      // ====== Phase B: CommandStore（Windows 本地化机制，优先级高于 plain text） ======
       const cmdVerb = cmdStore.get(raw.actualClsid);
       if (cmdVerb) {
-        // CommandStore MUIVerb 可能是间接字符串（@dll,-id），需 resolveIndirect 解析
         if (cmdVerb.startsWith('@') || cmdVerb.startsWith('ms-resource:')) {
           const resolved = this.win32.resolveIndirect(cmdVerb);
           if (resolved && resolved.length >= 2) {
@@ -258,6 +239,40 @@ export class ShellExtNameResolver {
         } else {
           log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore): "${cmdVerb}"`);
           return cmdVerb;
+        }
+      }
+
+      // ====== Phase C: Plain text 回退（开发者硬编码名称，可能是英文） ======
+      // Level 1-plain: CLSID.LocalizedString plain text
+      if (raw.clsidLocalizedString &&
+          !raw.clsidLocalizedString.startsWith('@') &&
+          !raw.clsidLocalizedString.startsWith('ms-resource:') &&
+          raw.clsidLocalizedString.length >= 2) {
+        if (!isUselessPlain(raw.clsidLocalizedString, fallback)) {
+          log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString plain): "${raw.clsidLocalizedString}"`);
+          return raw.clsidLocalizedString;
+        }
+      }
+
+      // Level 1.3-plain: Sibling Shell Key MUIVerb plain text
+      if (raw.siblingMUIVerb &&
+          !raw.siblingMUIVerb.startsWith('@') &&
+          !raw.siblingMUIVerb.startsWith('ms-resource:') &&
+          raw.siblingMUIVerb.length >= 2) {
+        if (!isUselessPlain(raw.siblingMUIVerb, fallback)) {
+          log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb): "${raw.siblingMUIVerb}"`);
+          return raw.siblingMUIVerb;
+        }
+      }
+
+      // Level 1.5-plain: CLSID.MUIVerb plain text
+      if (raw.clsidMUIVerb &&
+          !raw.clsidMUIVerb.startsWith('@') &&
+          !raw.clsidMUIVerb.startsWith('ms-resource:') &&
+          raw.clsidMUIVerb.length >= 2) {
+        if (!isUselessPlain(raw.clsidMUIVerb, fallback)) {
+          log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb): "${raw.clsidMUIVerb}"`);
+          return raw.clsidMUIVerb;
         }
       }
 

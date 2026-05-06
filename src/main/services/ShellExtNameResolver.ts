@@ -66,6 +66,7 @@ export interface PsRawShellExtItem {
   clsidDefault: string | null;
   dllPath: string | null;
   dllFileDescription: string | null;
+  dllProductName: string | null;
   siblingMUIVerb: string | null;
   registryKey: string;
 }
@@ -288,13 +289,18 @@ export class ShellExtNameResolver {
       }
     }
 
-    // Level 2.5: DLL FileDescription（PS 已通过 .NET FileVersionInfo 采集，天然支持 UI 语言）
-    if (raw.dllFileDescription && raw.dllFileDescription.length >= 2 && raw.dllFileDescription.length <= 64) {
-      if (!isGenericName(raw.dllFileDescription)) {
-        log.debug(`[NameResolver] ${fallback} → Level 2.5 (DLL FileDescription): "${raw.dllFileDescription}"`);
-        return raw.dllFileDescription;
+    // Level 2.5: DLL 版本资源（PS 采集，天然支持 UI 语言）
+    // 先试 FileDescription，再试 ProductName（通常为用户可见名）
+    const dllCandidates = [raw.dllFileDescription, raw.dllProductName];
+    for (const dllName of dllCandidates) {
+      if (dllName && dllName.length >= 2 && dllName.length <= 64) {
+        if (dllName.localeCompare(fallback, undefined, { sensitivity: 'base' }) === 0) continue;
+        if (!isGenericName(dllName)) {
+          log.debug(`[NameResolver] ${fallback} → Level 2.5 (DLL): "${dllName}"`);
+          return dllName;
+        }
+        log.debug(`[NameResolver] ${fallback} — Level 2.5 DLL "${dllName}" filtered as generic`);
       }
-      log.debug(`[NameResolver] ${fallback} — Level 2.5 DLL "${raw.dllFileDescription}" filtered as generic`);
     }
 
     // Level 3: directName plain 字符串

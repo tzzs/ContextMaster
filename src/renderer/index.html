@@ -191,6 +191,16 @@
   .setting-control { flex-shrink: 0; }
   select.native-select { height: 30px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 8px; font-size: 12px; background: var(--surface); color: var(--text); font-family: inherit; outline: none; cursor: pointer; }
   select.native-select:focus { border-color: var(--accent); }
+
+  /* ===== CUSTOM DIALOGS ===== */
+  dialog.cm-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 0; background: var(--surface); box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10); min-width: 340px; max-width: 480px; width: 92%; font-family: 'Noto Sans SC','Segoe UI Variable','Segoe UI',system-ui,sans-serif; }
+  dialog.cm-dialog::backdrop { background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+  .cm-dialog-header { padding: 16px 20px 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .cm-dialog-body { padding: 10px 20px 4px; }
+  .cm-dialog-msg { font-size: 13px; color: var(--text2); line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+  .cm-dialog-input { margin-top: 10px; width: 100%; height: 34px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; font-size: 13px; font-family: inherit; color: var(--text); background: var(--surface2); outline: none; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s; }
+  .cm-dialog-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,103,192,0.15); background: var(--surface); }
+  .cm-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px 18px; }
 </style>
 </head>
 <body>
@@ -514,6 +524,42 @@
   <button class="undo-btn" onclick="window.doUndo()" data-i18n="history.undo">撤销</button>
   <button class="undo-close" onclick="window.hideUndo()">✕</button>
 </div>
+
+<!-- 输入弹窗 -->
+<dialog id="cm-prompt-dialog" class="cm-dialog">
+  <div class="cm-dialog-header">新建备份</div>
+  <div class="cm-dialog-body">
+    <div class="cm-dialog-msg" id="cm-prompt-msg"></div>
+    <input class="cm-dialog-input" id="cm-prompt-input" type="text">
+  </div>
+  <div class="cm-dialog-footer">
+    <button class="btn btn-secondary" id="cm-prompt-cancel">取消</button>
+    <button class="btn btn-primary" id="cm-prompt-ok">确定</button>
+  </div>
+</dialog>
+
+<!-- 确认弹窗 -->
+<dialog id="cm-confirm-dialog" class="cm-dialog">
+  <div class="cm-dialog-header">确认操作</div>
+  <div class="cm-dialog-body">
+    <div class="cm-dialog-msg" id="cm-confirm-msg"></div>
+  </div>
+  <div class="cm-dialog-footer">
+    <button class="btn btn-secondary" id="cm-confirm-cancel">取消</button>
+    <button class="btn btn-primary" id="cm-confirm-ok">确定</button>
+  </div>
+</dialog>
+
+<!-- 提示弹窗 -->
+<dialog id="cm-alert-dialog" class="cm-dialog">
+  <div class="cm-dialog-header">提示</div>
+  <div class="cm-dialog-body">
+    <div class="cm-dialog-msg" id="cm-alert-msg"></div>
+  </div>
+  <div class="cm-dialog-footer">
+    <button class="btn btn-primary" id="cm-alert-ok">确定</button>
+  </div>
+</dialog>
 
 <script type="module" src="./main.ts"></script>
 </body>

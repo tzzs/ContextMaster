@@ -79,33 +79,51 @@ export class RegistryService {
       const classicItems = Array.isArray(raw) ? raw : (raw ? [raw] : []);
       const shellexItems = Array.isArray(shellexRaw) ? shellexRaw : [];
 
-      // Classic Shell 条目：通过 resolver 解析名称
-      const classicEntries: MenuItemEntry[] = classicItems.map((r: PsRawClassicItem) => ({
-        id: this.nextId++,
-        name: this.cleanDisplayName(this.resolver.resolveClassicName(r)),
-        command: r.command,
-        iconPath: r.rawIcon,
-        isEnabled: r.isEnabled,
-        source: '',
-        menuScene: scene,
-        registryKey: r.registryKey,
-        type: r.command && r.command.trim() ? MenuItemType.Custom : MenuItemType.System,
-        dllPath: null,
-      }));
+      // Classic Shell 条目：通过 resolver 解析名称（保护：单条失败不影响整体）
+      const classicEntries: MenuItemEntry[] = classicItems.map((r: PsRawClassicItem) => {
+        let name: string;
+        try {
+          name = this.cleanDisplayName(this.resolver.resolveClassicName(r));
+        } catch (e) {
+          log.warn(`[RegistryService] resolveClassicName failed for "${r.subKeyName}":`, String(e));
+          name = this.cleanDisplayName(r.subKeyName);
+        }
+        return {
+          id: this.nextId++,
+          name,
+          command: r.command,
+          iconPath: r.rawIcon,
+          isEnabled: r.isEnabled,
+          source: '',
+          menuScene: scene,
+          registryKey: r.registryKey,
+          type: r.command && r.command.trim() ? MenuItemType.Custom : MenuItemType.System,
+          dllPath: null,
+        };
+      });
 
-      // Shell 扩展条目：通过 resolver 解析名称
-      const shellexEntries: MenuItemEntry[] = shellexItems.map((r: PsRawShellExtItem) => ({
-        id: this.nextId++,
-        name: this.cleanDisplayName(this.resolver.resolveExtName(r, this.cmdStoreIndex)),
-        command: r.actualClsid,
-        iconPath: null,
-        isEnabled: r.isEnabled,
-        source: r.handlerKeyName,
-        menuScene: scene,
-        registryKey: r.registryKey,
-        type: MenuItemType.ShellExt,
-        dllPath: r.dllPath ?? null,
-      }));
+      // Shell 扩展条目：通过 resolver 解析名称（保护：单条失败不影响整体）
+      const shellexEntries: MenuItemEntry[] = shellexItems.map((r: PsRawShellExtItem) => {
+        let name: string;
+        try {
+          name = this.cleanDisplayName(this.resolver.resolveExtName(r, this.cmdStoreIndex));
+        } catch (e) {
+          log.warn(`[RegistryService] resolveExtName failed for "${r.cleanName}":`, String(e));
+          name = this.cleanDisplayName(r.cleanName);
+        }
+        return {
+          id: this.nextId++,
+          name,
+          command: r.actualClsid,
+          iconPath: null,
+          isEnabled: r.isEnabled,
+          source: r.handlerKeyName,
+          menuScene: scene,
+          registryKey: r.registryKey,
+          type: MenuItemType.ShellExt,
+          dllPath: r.dllPath ?? null,
+        };
+      });
 
       const result = [...classicEntries, ...shellexEntries];
 

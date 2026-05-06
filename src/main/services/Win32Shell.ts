@@ -9,16 +9,17 @@ export interface IWin32Shell {
 
 export class Win32Shell implements IWin32Shell {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private resolveIndirectFn: (...args: any[]) => number;
+  private resolveIndirectFn?: (...args: any[]) => number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private getFileVersionInfoSizeW: (...args: any[]) => [number, number];
+  private getFileVersionInfoSizeW?: (...args: any[]) => [number, number];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private getFileVersionInfoW: (...args: any[]) => boolean;
+  private getFileVersionInfoW?: (...args: any[]) => boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private verQueryValueW: (...args: any[]) => [boolean, bigint | null, number];
+  private verQueryValueW?: (...args: any[]) => [boolean, bigint | null, number];
 
   private indirectCache = new Map<string, string | null>();
   private versionCache = new Map<string, string | null>();
+  private koffiAvailable = true;
 
   // 用户 UI 语言 LCID（主语言 ID），用于 DLL 版本信息优先匹配
   private readonly uiLangId: number;
@@ -30,52 +31,49 @@ export class Win32Shell implements IWin32Shell {
   }
 
   constructor() {
-    const shlwapi = koffi.load('shlwapi.dll');
-    const version = koffi.load('version.dll');
-
-    // HRESULT SHLoadIndirectString(PCWSTR pszSource, PWSTR pszOutBuf, UINT cchOutBuf, void **ppvReserved)
-    // pszOutBuf 是 caller-provided writable buffer → 用 'void *' 让 koffi 正确传递 Buffer 地址
-    this.resolveIndirectFn = shlwapi.func('__stdcall', 'SHLoadIndirectString', 'int', [
-      'str16',    // PCWSTR pszSource
-      'void *',   // PWSTR pszOutBuf (fix: 原 'char16 *' 可能导致 Buffer 传递异常)
-      'uint32',   // UINT cchOutBuf
-      'void *',   // void **ppvReserved (always NULL)
-    ]);
-
-    this.getFileVersionInfoSizeW = version.func('__stdcall', 'GetFileVersionInfoSizeW', 'uint32', [
-      'str16',
-      koffi.out('uint32 *'),
-    ]);
-
-    this.getFileVersionInfoW = version.func('__stdcall', 'GetFileVersionInfoW', 'bool', [
-      'str16',
-      'uint32',
-      'uint32',
-      'void *',
-    ]);
-
-    this.verQueryValueW = version.func('__stdcall', 'VerQueryValueW', 'bool', [
-      'void *',
-      'str16',
-      koffi.out(koffi.pointer('void *')),
-      koffi.out('uint32 *'),
-    ]);
-
-    // 获取当前线程 UI 语言 LCID 的主语言 ID
-    // 中文(简体) = 0x0804 → langId = 0x04, 英语(美国) = 0x0409 → langId = 0x09
     try {
-      const buf = Buffer.alloc(4);
+      const shlwapi = koffi.load('shlwapi.dll');
+      const version = koffi.load('version.dll');
+
+      this.resolveIndirectFn = shlwapi.func('__stdcall', 'SHLoadIndirectString', 'int', [
+        'str16',    // PCWSTR pszSource
+        'void *',   // PWSTR pszOutBuf
+        'uint32',   // UINT cchOutBuf
+        'void *',   // void **ppvReserved
+      ]);
+
+      this.getFileVersionInfoSizeW = version.func('__stdcall', 'GetFileVersionInfoSizeW', 'uint32', [
+        'str16',
+        koffi.out('uint32 *'),
+      ]);
+
+      this.getFileVersionInfoW = version.func('__stdcall', 'GetFileVersionInfoW', 'bool', [
+        'str16',
+        'uint32',
+        'uint32',
+        'void *',
+      ]);
+
+      this.verQueryValueW = version.func('__stdcall', 'VerQueryValueW', 'bool', [
+        'void *',
+        'str16',
+        koffi.out(koffi.pointer('void *')),
+        koffi.out('uint32 *'),
+      ]);
+
       // GetUserDefaultUILanguage() returns LANGID (16-bit)
       const kernel32 = koffi.load('kernel32.dll');
       const getLangId = kernel32.func('__stdcall', 'GetUserDefaultUILanguage', 'uint16', []);
-      this.uiLangId = getLangId() & 0xFF; // 主语言 ID
-      log.debug(`[Win32Shell] UI language ID: 0x${this.uiLangId.toString(16).padStart(2, '0')}`);
-    } catch {
-      this.uiLangId = 0x09; // fallback: English
+      this.uiLangId = getLangId() & 0xFF;
+    } catch (e) {
+      log.error('[Win32Shell] Failed to initialize koffi FFI:', String(e));
+      this.koffiAvailable = false;
+      this.uiLangId = 0x09;
     }
   }
 
   resolveIndirect(source: string): string | null {
+    if (!this.koffiAvailable || !this.resolveIndirectFn) return null;
     if (!source || (!source.startsWith('@') && !source.startsWith('ms-resource:'))) {
       return null;
     }
@@ -83,17 +81,16 @@ export class Win32Shell implements IWin32Shell {
     if (cached !== undefined) return cached;
 
     try {
-      // 使用 koffi.alloc 分配输出缓冲区（Node.js Buffer.alloc 与 koffi 类型系统不兼容）
-      const buf = koffi.alloc('char16', 512);
-      const hr = this.resolveIndirectFn(source, buf, 512, null);
+      // Buffer.alloc + 'void *' 才能在 koffi 中正确传递预分配输出缓冲区
+      // koffi.alloc('char16') + decode('str16') 会导致 segfault
+      const buf = Buffer.alloc(2048);
+      const hr = this.resolveIndirectFn(source, buf, 1024, null);
       if (hr === 0) {
-        const result = koffi.decode(buf, 'str16');
-        koffi.free(buf);
+        const result = buf.toString('utf16le').replace(/\0[\s\S]*$/, '');
         log.debug(`[Win32Shell] SHLoadIndirectString("${source.substring(0, 50)}...") → "${result}"`);
         this.indirectCache.set(source, result || null);
         return result || null;
       }
-      koffi.free(buf);
       log.debug(`[Win32Shell] SHLoadIndirectString failed with HRESULT 0x${(hr >>> 0).toString(16)} for "${source.substring(0, 50)}..."`);
       this.indirectCache.set(source, null);
       return null;
@@ -105,25 +102,26 @@ export class Win32Shell implements IWin32Shell {
   }
 
   getFileVersionInfo(dllPath: string): string | null {
+    if (!this.koffiAvailable || !this.getFileVersionInfoSizeW) return null;
     const cached = this.versionCache.get(dllPath);
     if (cached !== undefined) return cached;
 
     try {
-      const [size] = this.getFileVersionInfoSizeW(dllPath, [0]);
+      const [size] = this.getFileVersionInfoSizeW!(dllPath, [0]);
       if (!size || size === 0) {
         this.versionCache.set(dllPath, null);
         return null;
       }
 
       const data = Buffer.alloc(size);
-      if (!this.getFileVersionInfoW(dllPath, 0, size, data)) {
+      if (!this.getFileVersionInfoW!(dllPath, 0, size, data)) {
         log.debug(`[Win32Shell] GetFileVersionInfoW failed for "${dllPath}"`);
         this.versionCache.set(dllPath, null);
         return null;
       }
 
       // Query translation table
-      const [, transPtr, transLen] = this.verQueryValueW(data, '\\VarFileInfo\\Translation');
+      const [, transPtr, transLen] = this.verQueryValueW!(data, '\\VarFileInfo\\Translation');
       if (!transPtr || transLen < 4) {
         log.debug(`[Win32Shell] No Translation table in "${dllPath}"`);
         this.versionCache.set(dllPath, null);
@@ -151,7 +149,7 @@ export class Win32Shell implements IWin32Shell {
 
       // Query FileDescription / ProductName for each language (UI language first)
       for (const langKey of orderedKeys) {
-        const [, descPtr, descLen] = this.verQueryValueW(data, `\\StringFileInfo\\${langKey}\\FileDescription`);
+        const [, descPtr, descLen] = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\FileDescription`);
         if (descPtr && descLen > 0) {
           const desc = koffi.decode(descPtr, 'str16');
           if (desc && desc.length >= 2 && desc.length <= 64) {
@@ -161,7 +159,7 @@ export class Win32Shell implements IWin32Shell {
           }
         }
 
-        const [, prodPtr, prodLen] = this.verQueryValueW(data, `\\StringFileInfo\\${langKey}\\ProductName`);
+        const [, prodPtr, prodLen] = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\ProductName`);
         if (prodPtr && prodLen > 0) {
           const prod = koffi.decode(prodPtr, 'str16');
           if (prod && prod.length >= 2 && prod.length <= 64) {

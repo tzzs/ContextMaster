@@ -119,6 +119,8 @@ export class CommandStoreIndex {
     }
   }
 
+  get size(): number { return this.map.size; }
+
   get(clsid: string): string | null {
     return this.map.get(clsid.toLowerCase()) ?? null;
   }

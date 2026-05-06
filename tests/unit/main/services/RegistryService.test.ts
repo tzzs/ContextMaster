@@ -24,6 +24,7 @@ function createMockResolver(resolveClassicName?: (raw: any) => string, resolveEx
   const win32: IWin32Shell = {
     resolveIndirect: vi.fn().mockReturnValue(null),
     getFileVersionInfo: vi.fn().mockReturnValue(null),
+    uiLanguage: 'zh',
   };
   const resolver = new ShellExtNameResolver(win32);
   if (resolveClassicName) vi.spyOn(resolver, 'resolveClassicName').mockImplementation(resolveClassicName);

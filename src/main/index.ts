@@ -62,7 +62,7 @@ function initServices(): MenuManagerService {
   const db = getDatabase();
   const ps = new PowerShellBridge();
   const win32Shell = new Win32Shell();
-  const resolver = new ShellExtNameResolver(win32Shell);
+  const resolver = new ShellExtNameResolver(win32Shell, win32Shell.uiLanguage);
   const cmdStoreIndex = new CommandStoreIndex();
   const registry = new RegistryService(ps, resolver, cmdStoreIndex);
   const opRepo = new OperationRecordRepo(db);

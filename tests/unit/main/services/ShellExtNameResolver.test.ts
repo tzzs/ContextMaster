@@ -10,7 +10,6 @@ import { IWin32Shell } from '@/main/services/Win32Shell';
 function createMockWin32(lang: 'zh' | 'en' = 'zh'): IWin32Shell {
   return {
     resolveIndirect: vi.fn().mockReturnValue(null),
-    getFileVersionInfo: vi.fn().mockReturnValue(null),
     uiLanguage: lang,
   };
 }
@@ -40,6 +39,7 @@ function createShellExtItem(overrides: Partial<PsRawShellExtItem> = {}): PsRawSh
     clsidMUIVerb: null,
     clsidDefault: null,
     dllPath: null,
+    dllFileDescription: null,
     siblingMUIVerb: null,
     registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\TestExt',
     ...overrides,
@@ -242,21 +242,22 @@ describe('ShellExtNameResolver', () => {
     });
 
     // Level 2.5: DLL FileDescription
-    it('Level 2.5: 应返回 DLL FileDescription', () => {
-      vi.mocked(win32.getFileVersionInfo).mockReturnValue('阿里云盘');
+    it('Level 2.5: 应返回 DLL FileDescription（PS 采集）', () => {
       const item = createShellExtItem({
         clsidLocalizedString: null,
         clsidMUIVerb: null,
         clsidDefault: null,
-        dllPath: 'C:\\Program Files\\YunShellExt\\YunShellExt64.dll',
+        dllFileDescription: '阿里云盘',
       });
       expect(resolver.resolveExtName(item, cmdStore)).toBe('阿里云盘');
     });
 
     it('Level 2.5: 应过滤泛型 DLL 描述（如 "Vim Shell Extension"）', () => {
-      vi.mocked(win32.getFileVersionInfo).mockReturnValue('Vim Shell Extension');
       const item = createShellExtItem({
-        dllPath: 'C:\\Vim\\gvimext.dll',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+        dllFileDescription: 'Vim Shell Extension',
       });
       expect(resolver.resolveExtName(item, cmdStore)).toBe('TestExt'); // fallback
     });

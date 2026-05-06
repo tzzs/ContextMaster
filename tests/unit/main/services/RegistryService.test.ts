@@ -23,7 +23,6 @@ function createMockPs(): MockedObject<PowerShellBridge> {
 function createMockResolver(resolveClassicName?: (raw: any) => string, resolveExtName?: (raw: any, cmdStore: any) => string): ShellExtNameResolver {
   const win32: IWin32Shell = {
     resolveIndirect: vi.fn().mockReturnValue(null),
-    getFileVersionInfo: vi.fn().mockReturnValue(null),
     uiLanguage: 'zh',
   };
   const resolver = new ShellExtNameResolver(win32);

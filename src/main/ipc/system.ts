@@ -125,8 +125,6 @@ export function registerSystemHandlers(
         koffiAvailable: false,
         resolveIndirectResult: null,
         resolveIndirectError: null,
-        fileVersionResult: null,
-        fileVersionError: null,
         uiLanguage: 'unknown',
         cmdStoreSize: getCmdStoreSize ? getCmdStoreSize() : 0,
       };
@@ -147,16 +145,6 @@ export function registerSystemHandlers(
       } catch (e) {
         result.resolveIndirectError = String(e);
         log.error('[Diagnose] resolveIndirect test failed:', e);
-      }
-
-      // 测试 GetFileVersionInfo
-      try {
-        const fv = win32Shell.getFileVersionInfo('C:\\Windows\\System32\\shell32.dll');
-        result.fileVersionResult = fv;
-        log.info(`[Diagnose] getFileVersionInfo test: "${fv}"`);
-      } catch (e) {
-        result.fileVersionError = String(e);
-        log.error('[Diagnose] getFileVersionInfo test failed:', e);
       }
 
       return result;

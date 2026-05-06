@@ -278,6 +278,16 @@ $result = @($handlers | ForEach-Object {
       }
     }
   }
+  # DLL FileDescription（.NET FileVersionInfo，天然支持 UI 语言，无需 koffi）
+  $dllFileDescription = $null
+  if ($dllPath -and (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
+    try {
+      $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
+      if ($vi.FileDescription -and $vi.FileDescription.Length -ge 2) {
+        $dllFileDescription = [string]$vi.FileDescription
+      }
+    } catch {}
+  }
   # sibling shell key MUIVerb
   $siblingMUIVerb = $null
   if ($shellPath) {
@@ -299,6 +309,7 @@ $result = @($handlers | ForEach-Object {
     clsidMUIVerb         = $clsidMUIVerb
     clsidDefault         = $clsidDefault
     dllPath              = $dllPath
+    dllFileDescription   = $dllFileDescription
     siblingMUIVerb       = $siblingMUIVerb
     registryKey          = [string]$regKey
   }

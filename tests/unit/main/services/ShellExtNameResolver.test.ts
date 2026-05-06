@@ -7,10 +7,11 @@ import {
 } from '@/main/services/ShellExtNameResolver';
 import { IWin32Shell } from '@/main/services/Win32Shell';
 
-function createMockWin32(): IWin32Shell {
+function createMockWin32(lang: 'zh' | 'en' = 'zh'): IWin32Shell {
   return {
     resolveIndirect: vi.fn().mockReturnValue(null),
     getFileVersionInfo: vi.fn().mockReturnValue(null),
+    uiLanguage: lang,
   };
 }
 
@@ -386,6 +387,63 @@ describe('ShellExtNameResolver', () => {
         clsidLocalizedString: '外壳服务对象',
       });
       expect(resolver.resolveExtName(item, cmdStore)).toBe('TestExt');
+    });
+  });
+
+  // ---- 标准谓词翻译 ----
+
+  describe('Standard Verb Translation', () => {
+    const cmdStore = new CommandStoreIndex();
+
+    it('应翻译标准动词 open → 打开', () => {
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'open' });
+      expect(resolver.resolveClassicName(item)).toBe('打开');
+    });
+
+    it('应翻译标准动词 edit → 编辑', () => {
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'edit' });
+      expect(resolver.resolveClassicName(item)).toBe('编辑');
+    });
+
+    it('应翻译标准动词 properties → 属性', () => {
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'properties' });
+      expect(resolver.resolveClassicName(item)).toBe('属性');
+    });
+
+    it('应翻译标准动词 runas → 以管理员身份运行', () => {
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'runas' });
+      expect(resolver.resolveClassicName(item)).toBe('以管理员身份运行');
+    });
+
+    it('英文模式下应返回英文翻译', () => {
+      const enWin32 = createMockWin32('en');
+      const enResolver = new ShellExtNameResolver(enWin32, 'en');
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'open' });
+      expect(enResolver.resolveClassicName(item)).toBe('Open');
+    });
+
+    it('大小写不敏感匹配', () => {
+      const item = createClassicItem({ rawMUIVerb: null, rawDefault: null, subKeyName: 'Open' });
+      expect(resolver.resolveClassicName(item)).toBe('打开');
+    });
+
+    it('ShellExt cleanName 为 sendto 时应翻译为 发送到', () => {
+      const item = createShellExtItem({
+        cleanName: 'sendto',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+      });
+      expect(resolver.resolveExtName(item, cmdStore)).toBe('发送到');
+    });
+
+    it('ShellExt cleanName 为 print 时应翻译为 打印', () => {
+      const item = createShellExtItem({
+        cleanName: 'print',
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+      });
+      expect(resolver.resolveExtName(item, cmdStore)).toBe('打印');
     });
   });
 

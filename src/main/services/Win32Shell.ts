@@ -4,6 +4,7 @@ import log from '../utils/logger';
 export interface IWin32Shell {
   resolveIndirect(source: string): string | null;
   getFileVersionInfo(dllPath: string): string | null;
+  readonly uiLanguage: 'zh' | 'en';
 }
 
 export class Win32Shell implements IWin32Shell {
@@ -19,8 +20,14 @@ export class Win32Shell implements IWin32Shell {
   private indirectCache = new Map<string, string | null>();
   private versionCache = new Map<string, string | null>();
 
-  // 用户 UI 语言 LCID，用于 DLL 版本信息优先匹配
+  // 用户 UI 语言 LCID（主语言 ID），用于 DLL 版本信息优先匹配
   private readonly uiLangId: number;
+
+  /** 暴露给 ShellExtNameResolver 用于标准谓词翻译 */
+  get uiLanguage(): 'zh' | 'en' {
+    // 中文主语言 ID = 0x04 (简体/繁体均适用)
+    return this.uiLangId === 0x04 ? 'zh' : 'en';
+  }
 
   constructor() {
     const shlwapi = koffi.load('shlwapi.dll');
@@ -76,14 +83,17 @@ export class Win32Shell implements IWin32Shell {
     if (cached !== undefined) return cached;
 
     try {
-      const buf = Buffer.alloc(1024);
+      // 使用 koffi.alloc 分配输出缓冲区（Node.js Buffer.alloc 与 koffi 类型系统不兼容）
+      const buf = koffi.alloc('char16', 512);
       const hr = this.resolveIndirectFn(source, buf, 512, null);
       if (hr === 0) {
-        const result = buf.toString('utf16le').replace(/\0[\s\S]*$/, '');
+        const result = koffi.decode(buf, 'str16');
+        koffi.free(buf);
         log.debug(`[Win32Shell] SHLoadIndirectString("${source.substring(0, 50)}...") → "${result}"`);
         this.indirectCache.set(source, result || null);
         return result || null;
       }
+      koffi.free(buf);
       log.debug(`[Win32Shell] SHLoadIndirectString failed with HRESULT 0x${(hr >>> 0).toString(16)} for "${source.substring(0, 50)}..."`);
       this.indirectCache.set(source, null);
       return null;

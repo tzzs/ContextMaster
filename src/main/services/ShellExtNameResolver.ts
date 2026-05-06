@@ -1,6 +1,47 @@
 import { IWin32Shell } from './Win32Shell';
 import log from '../utils/logger';
 
+// ---- 标准谓词翻译表 ----
+// Windows 对 open/edit/print 等标准 shell 动词有内置翻译，MUIVerb 为空时生效
+// 参考: https://learn.microsoft.com/en-us/windows/win32/shell/context-menu-handlers
+const STANDARD_VERBS: Record<string, { zh: string; en: string }> = {
+  'open':            { zh: '打开',               en: 'Open' },
+  'edit':            { zh: '编辑',               en: 'Edit' },
+  'print':           { zh: '打印',               en: 'Print' },
+  'printto':         { zh: '打印到',             en: 'Print to' },
+  'find':            { zh: '搜索',               en: 'Find' },
+  'explore':         { zh: '浏览',               en: 'Explore' },
+  'play':            { zh: '播放',               en: 'Play' },
+  'preview':         { zh: '预览',               en: 'Preview' },
+  'runas':           { zh: '以管理员身份运行',   en: 'Run as administrator' },
+  'runasuser':       { zh: '以其他用户身份运行', en: 'Run as different user' },
+  'properties':      { zh: '属性',               en: 'Properties' },
+  'cut':             { zh: '剪切',               en: 'Cut' },
+  'copy':            { zh: '复制',               en: 'Copy' },
+  'paste':           { zh: '粘贴',               en: 'Paste' },
+  'delete':          { zh: '删除',               en: 'Delete' },
+  'rename':          { zh: '重命名',             en: 'Rename' },
+  'sendto':          { zh: '发送到',             en: 'Send to' },
+  'new':             { zh: '新建',               en: 'New' },
+  'select':          { zh: '选择',               en: 'Select' },
+  'refresh':         { zh: '刷新',               en: 'Refresh' },
+  'view':            { zh: '查看',               en: 'View' },
+  'sort':            { zh: '排序',               en: 'Sort' },
+  'share':           { zh: '共享',               en: 'Share' },
+  'format':          { zh: '格式化',             en: 'Format' },
+  'eject':           { zh: '弹出',               en: 'Eject' },
+  'install':         { zh: '安装',               en: 'Install' },
+  'config':          { zh: '配置',               en: 'Configure' },
+  'scan':            { zh: '扫描',               en: 'Scan' },
+  'restore':         { zh: '还原',               en: 'Restore' },
+  'togglehidden':    { zh: '显示/隐藏',          en: 'Toggle Hidden' },
+  'pintohome':       { zh: '固定到快速访问',     en: 'Pin to Quick access' },
+  'pintotaskbar':    { zh: '固定到任务栏',       en: 'Pin to taskbar' },
+  'unpintotaskbar':  { zh: '从任务栏取消固定',   en: 'Unpin from taskbar' },
+  'pinToStart':      { zh: '固定到"开始"屏幕',  en: 'Pin to Start' },
+  'unpinFromStart':  { zh: '从"开始"屏幕取消固定', en: 'Unpin from Start' },
+};
+
 // ---- 数据契约：PS 脚本返回的原始数据 ----
 
 export interface PsRawClassicItem {
@@ -87,10 +128,23 @@ export class CommandStoreIndex {
   }
 }
 
+function translateStandardVerb(name: string, language: 'zh' | 'en'): string | null {
+  const lc = name.toLowerCase().trim();
+  const entry = STANDARD_VERBS[lc];
+  if (entry) {
+    return entry[language] || entry.en;
+  }
+  return null;
+}
+
 // ---- Shell 扩展名称解析器 ----
 
 export class ShellExtNameResolver {
-  constructor(private readonly win32: IWin32Shell) {}
+  private readonly language: 'zh' | 'en';
+
+  constructor(private readonly win32: IWin32Shell, language: 'zh' | 'en' = 'zh') {
+    this.language = language;
+  }
 
   /** Classic Shell 条目名称解析 */
   resolveClassicName(raw: PsRawClassicItem): string {
@@ -108,6 +162,13 @@ export class ShellExtNameResolver {
       } else {
         return cand;
       }
+    }
+
+    // 标准谓词翻译：open → 打开, edit → 编辑, ...
+    const translated = translateStandardVerb(raw.subKeyName, this.language);
+    if (translated) {
+      log.debug(`[NameResolver] Standard verb "${raw.subKeyName}" → "${translated}"`);
+      return translated;
     }
 
     return raw.subKeyName;
@@ -220,6 +281,13 @@ export class ShellExtNameResolver {
         log.debug(`[NameResolver] ${fallback} → Level 3 (directName plain): "${raw.defaultVal}"`);
         return raw.defaultVal;
       }
+    }
+
+    // 标准谓词翻译：对 cleanName 做最后一搏
+    const translated = translateStandardVerb(fallback, this.language);
+    if (translated) {
+      log.debug(`[NameResolver] ${fallback} → Standard verb translation: "${translated}"`);
+      return translated;
     }
 
     log.debug(`[NameResolver] ${fallback} → Fallback (key name)`);

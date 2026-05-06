@@ -2,6 +2,7 @@ import { MenuScene, MenuItemType } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { PowerShellBridge } from './PowerShellBridge';
 import { RegistryCache } from '../utils/RegistryCache';
+import { ShellExtNameResolver, CommandStoreIndex, PsRawClassicItem, PsRawShellExtItem } from './ShellExtNameResolver';
 import log from '../utils/logger';
 
 // 与 C# RegistryService._sceneRegistryPaths 完全一致
@@ -27,28 +28,25 @@ const SCENE_SHELLEX_PATHS: Record<MenuScene, string> = {
 // 完整 HKCR 前缀（用于显示）
 const HKCR_PREFIX = 'HKEY_CLASSES_ROOT';
 
-interface PsMenuItemRaw {
-  name: string;
-  command: string;
-  iconPath: string | null;
-  isEnabled: boolean;
-  source: string;
-  registryKey: string;
-  subKeyName: string;
-  itemType?: string;  // 'ShellExt' for shell extensions
-  dllPath?: string | null;
-}
-
 export class RegistryService {
   private readonly ps: PowerShellBridge;
   private readonly cache: RegistryCache;
+  private readonly resolver: ShellExtNameResolver;
+  private readonly cmdStoreIndex: CommandStoreIndex;
   /** 事务回滚数据：registryKey → 原始 isEnabled */
   private rollbackData = new Map<string, boolean>();
   private inTransaction = false;
   private nextId = 1;
 
-  constructor(ps: PowerShellBridge, cache?: RegistryCache) {
+  constructor(
+    ps: PowerShellBridge,
+    resolver: ShellExtNameResolver,
+    cmdStoreIndex: CommandStoreIndex,
+    cache?: RegistryCache,
+  ) {
     this.ps = ps;
+    this.resolver = resolver;
+    this.cmdStoreIndex = cmdStoreIndex;
     this.cache = cache ?? new RegistryCache();
   }
 
@@ -72,29 +70,44 @@ export class RegistryService {
       const script = this.ps.buildGetItemsScript(basePath);
       const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
       const [raw, shellexRaw] = await Promise.all([
-        this.ps.execute<PsMenuItemRaw[]>(script, priority),
-        this.ps.execute<PsMenuItemRaw[]>(shellexScript, priority).catch((e) => {
+        this.ps.execute<PsRawClassicItem[]>(script, priority),
+        this.ps.execute<PsRawShellExtItem[]>(shellexScript, priority).catch((e) => {
           log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
-          return [] as PsMenuItemRaw[];
+          return [] as PsRawShellExtItem[];
         }),
       ]);
-      const items = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      const classicItems = Array.isArray(raw) ? raw : (raw ? [raw] : []);
       const shellexItems = Array.isArray(shellexRaw) ? shellexRaw : [];
 
-      const result = [...items, ...shellexItems].map((r) => ({
+      // Classic Shell 条目：通过 resolver 解析名称
+      const classicEntries: MenuItemEntry[] = classicItems.map((r: PsRawClassicItem) => ({
         id: this.nextId++,
-        name: this.cleanDisplayName(
-          (r.name && !r.name.startsWith('@')) ? r.name : (r.subKeyName || r.name)
-        ),
+        name: this.cleanDisplayName(this.resolver.resolveClassicName(r)),
         command: r.command,
-        iconPath: r.iconPath,
+        iconPath: r.rawIcon,
         isEnabled: r.isEnabled,
-        source: r.source || this.inferSource(r.subKeyName),
+        source: '',
         menuScene: scene,
         registryKey: r.registryKey,
-        type: this.determineType(r.itemType, r.command),
+        type: r.command && r.command.trim() ? MenuItemType.Custom : MenuItemType.System,
+        dllPath: null,
+      }));
+
+      // Shell 扩展条目：通过 resolver 解析名称
+      const shellexEntries: MenuItemEntry[] = shellexItems.map((r: PsRawShellExtItem) => ({
+        id: this.nextId++,
+        name: this.cleanDisplayName(this.resolver.resolveExtName(r, this.cmdStoreIndex)),
+        command: r.actualClsid,
+        iconPath: null,
+        isEnabled: r.isEnabled,
+        source: r.handlerKeyName,
+        menuScene: scene,
+        registryKey: r.registryKey,
+        type: MenuItemType.ShellExt,
         dllPath: r.dllPath ?? null,
       }));
+
+      const result = [...classicEntries, ...shellexEntries];
 
       // 写入缓存
       this.cache.set(scene, result);
@@ -225,10 +238,6 @@ export class RegistryService {
     return registryKey.includes('shellex') && registryKey.includes('ContextMenuHandlers');
   }
 
-  private inferSource(subKeyName: string): string {
-    return subKeyName || '';
-  }
-
   private cleanDisplayName(name: string): string {
     if (!name) return name;
     return name
@@ -240,9 +249,4 @@ export class RegistryService {
       .trim();
   }
 
-  private determineType(itemType?: string, command?: string): MenuItemType {
-    if (itemType === 'ShellExt') return MenuItemType.ShellExt;
-    if (command && command.trim()) return MenuItemType.Custom;
-    return MenuItemType.System;
-  }
 }

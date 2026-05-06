@@ -108,7 +108,9 @@ export class Win32Shell implements IWin32Shell {
     if (cached !== undefined) return cached;
 
     try {
-      const [size] = this.getFileVersionInfoSizeW!(dllPath, [0]);
+      // koffi out 参数在运行时可能返回 number 而非 [number,number] 元组
+      const fvResult = this.getFileVersionInfoSizeW!(dllPath, [0]);
+      const size: number = Array.isArray(fvResult) ? fvResult[0] : (fvResult as unknown as number);
       if (!size || size === 0) {
         this.versionCache.set(dllPath, null);
         return null;
@@ -122,7 +124,9 @@ export class Win32Shell implements IWin32Shell {
       }
 
       // Query translation table
-      const [, transPtr, transLen] = this.verQueryValueW!(data, '\\VarFileInfo\\Translation');
+      const vtResult = this.verQueryValueW!(data, '\\VarFileInfo\\Translation');
+      const transPtr: bigint | null = Array.isArray(vtResult) ? vtResult[1] : null;
+      const transLen: number = Array.isArray(vtResult) ? (vtResult[2] as number) : 0;
       if (!transPtr || transLen < 4) {
         log.debug(`[Win32Shell] No Translation table in "${dllPath}"`);
         this.versionCache.set(dllPath, null);
@@ -150,7 +154,9 @@ export class Win32Shell implements IWin32Shell {
 
       // Query FileDescription / ProductName for each language (UI language first)
       for (const langKey of orderedKeys) {
-        const [, descPtr, descLen] = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\FileDescription`);
+        const descResult = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\FileDescription`);
+        const descPtr: bigint | null = Array.isArray(descResult) ? descResult[1] : null;
+        const descLen: number = Array.isArray(descResult) ? (descResult[2] as number) : 0;
         if (descPtr && descLen > 0) {
           const desc = koffi.decode(descPtr, 'str16');
           if (desc && desc.length >= 2 && desc.length <= 64) {
@@ -160,7 +166,9 @@ export class Win32Shell implements IWin32Shell {
           }
         }
 
-        const [, prodPtr, prodLen] = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\ProductName`);
+        const prodResult = this.verQueryValueW!(data, `\\StringFileInfo\\${langKey}\\ProductName`);
+        const prodPtr: bigint | null = Array.isArray(prodResult) ? prodResult[1] : null;
+        const prodLen: number = Array.isArray(prodResult) ? (prodResult[2] as number) : 0;
         if (prodPtr && prodLen > 0) {
           const prod = koffi.decode(prodPtr, 'str16');
           if (prod && prod.length >= 2 && prod.length <= 64) {

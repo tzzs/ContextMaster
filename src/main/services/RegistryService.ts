@@ -127,6 +127,13 @@ export class RegistryService {
 
       const result = [...classicEntries, ...shellexEntries];
 
+      // 逐条诊断日志: 打印每个 ShellExt 条目的解析结果和原始数据
+      for (let i = 0; i < shellexEntries.length; i++) {
+        const entry = shellexEntries[i];
+        const raw = shellexItems[i];
+        log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
+      }
+
       // 写入缓存
       this.cache.set(scene, result);
       

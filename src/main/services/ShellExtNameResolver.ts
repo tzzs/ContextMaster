@@ -121,7 +121,10 @@ export class ShellExtNameResolver {
     if (raw.defaultVal && (raw.defaultVal.startsWith('@') || raw.defaultVal.startsWith('ms-resource:'))) {
       try {
         const resolved = this.win32.resolveIndirect(raw.defaultVal);
-        if (resolved && resolved.length >= 2) return resolved;
+        if (resolved && resolved.length >= 2) {
+          log.debug(`[NameResolver] ${fallback} → Level 0 (directName indirect): "${resolved}"`);
+          return resolved;
+        }
       } catch { /* fall through */ }
     }
 
@@ -132,10 +135,16 @@ export class ShellExtNameResolver {
         if (raw.clsidLocalizedString.startsWith('@') || raw.clsidLocalizedString.startsWith('ms-resource:')) {
           try {
             const resolved = this.win32.resolveIndirect(raw.clsidLocalizedString);
-            if (resolved && resolved.length >= 2) return resolved;
+            if (resolved && resolved.length >= 2) {
+              log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString indirect): "${resolved}"`);
+              return resolved;
+            }
           } catch { /* fall through */ }
         } else if (raw.clsidLocalizedString.length >= 2) {
-          if (!isUselessPlain(raw.clsidLocalizedString, fallback)) return raw.clsidLocalizedString;
+          if (!isUselessPlain(raw.clsidLocalizedString, fallback)) {
+            log.debug(`[NameResolver] ${fallback} → Level 1 (LocalizedString plain): "${raw.clsidLocalizedString}"`);
+            return raw.clsidLocalizedString;
+          }
         }
       }
 
@@ -144,10 +153,16 @@ export class ShellExtNameResolver {
         if (raw.siblingMUIVerb.startsWith('@') || raw.siblingMUIVerb.startsWith('ms-resource:')) {
           try {
             const resolved = this.win32.resolveIndirect(raw.siblingMUIVerb);
-            if (resolved && resolved.length >= 2) return resolved;
+            if (resolved && resolved.length >= 2) {
+              log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb indirect): "${resolved}"`);
+              return resolved;
+            }
           } catch { /* fall through */ }
         } else if (raw.siblingMUIVerb.length >= 2) {
-          if (!isUselessPlain(raw.siblingMUIVerb, fallback)) return raw.siblingMUIVerb;
+          if (!isUselessPlain(raw.siblingMUIVerb, fallback)) {
+            log.debug(`[NameResolver] ${fallback} → Level 1.3 (sibling MUIVerb): "${raw.siblingMUIVerb}"`);
+            return raw.siblingMUIVerb;
+          }
         }
       }
 
@@ -156,20 +171,32 @@ export class ShellExtNameResolver {
         if (raw.clsidMUIVerb.startsWith('@') || raw.clsidMUIVerb.startsWith('ms-resource:')) {
           try {
             const resolved = this.win32.resolveIndirect(raw.clsidMUIVerb);
-            if (resolved && resolved.length >= 2) return resolved;
+            if (resolved && resolved.length >= 2) {
+              log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb indirect): "${resolved}"`);
+              return resolved;
+            }
           } catch { /* fall through */ }
         } else if (raw.clsidMUIVerb.length >= 2) {
-          if (!isUselessPlain(raw.clsidMUIVerb, fallback)) return raw.clsidMUIVerb;
+          if (!isUselessPlain(raw.clsidMUIVerb, fallback)) {
+            log.debug(`[NameResolver] ${fallback} → Level 1.5 (MUIVerb): "${raw.clsidMUIVerb}"`);
+            return raw.clsidMUIVerb;
+          }
         }
       }
 
       // Level 1.7: CommandStore 反向索引
       const cmdVerb = cmdStore.get(raw.actualClsid);
-      if (cmdVerb) return cmdVerb;
+      if (cmdVerb) {
+        log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore): "${cmdVerb}"`);
+        return cmdVerb;
+      }
 
       // Level 2: CLSID 默认值
       if (raw.clsidDefault && raw.clsidDefault.length >= 2) {
-        if (!isUselessPlain(raw.clsidDefault, fallback)) return raw.clsidDefault;
+        if (!isUselessPlain(raw.clsidDefault, fallback)) {
+          log.debug(`[NameResolver] ${fallback} → Level 2 (CLSID Default): "${raw.clsidDefault}"`);
+          return raw.clsidDefault;
+        }
       }
     }
 
@@ -177,7 +204,11 @@ export class ShellExtNameResolver {
     if (raw.dllPath) {
       const dllName = this.win32.getFileVersionInfo(raw.dllPath);
       if (dllName && dllName.length >= 2 && dllName.length <= 64) {
-        if (!isGenericName(dllName)) return dllName;
+        if (!isGenericName(dllName)) {
+          log.debug(`[NameResolver] ${fallback} → Level 2.5 (DLL): "${dllName}"`);
+          return dllName;
+        }
+        log.debug(`[NameResolver] ${fallback} — Level 2.5 DLL "${dllName}" filtered as generic`);
       }
     }
 
@@ -185,10 +216,13 @@ export class ShellExtNameResolver {
     if (raw.defaultVal &&
         !raw.defaultVal.startsWith('@') &&
         !raw.defaultVal.startsWith('ms-resource:')) {
-      if (!isUselessPlain(raw.defaultVal, fallback)) return raw.defaultVal;
+      if (!isUselessPlain(raw.defaultVal, fallback)) {
+        log.debug(`[NameResolver] ${fallback} → Level 3 (directName plain): "${raw.defaultVal}"`);
+        return raw.defaultVal;
+      }
     }
 
-    // Fallback: 键名
+    log.debug(`[NameResolver] ${fallback} → Fallback (key name)`);
     return fallback;
   }
 }

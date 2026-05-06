@@ -82,7 +82,7 @@ function initServices(): MenuManagerService {
   registerRegistryHandlers(menuManager);
   registerHistoryHandlers(history, menuManager);
   registerBackupHandlers(backup);
-  registerSystemHandlers(win32Shell, cmdStoreIndex.size);
+  registerSystemHandlers(win32Shell, () => cmdStoreIndex.size);
   return menuManager;
 }
 

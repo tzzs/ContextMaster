@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 
 export function registerSystemHandlers(
   win32Shell?: IWin32Shell,
-  cmdStoreSize?: number,
+  getCmdStoreSize?: () => number,
 ): void {
   ipcMain.handle(
     IPC.SYS_IS_ADMIN,
@@ -128,7 +128,7 @@ export function registerSystemHandlers(
         fileVersionResult: null,
         fileVersionError: null,
         uiLanguage: 'unknown',
-        cmdStoreSize: cmdStoreSize ?? 0,
+        cmdStoreSize: getCmdStoreSize ? getCmdStoreSize() : 0,
       };
 
       if (!win32Shell) {

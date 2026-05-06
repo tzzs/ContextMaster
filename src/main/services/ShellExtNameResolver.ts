@@ -248,8 +248,17 @@ export class ShellExtNameResolver {
       // Level 1.7: CommandStore 反向索引
       const cmdVerb = cmdStore.get(raw.actualClsid);
       if (cmdVerb) {
-        log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore): "${cmdVerb}"`);
-        return cmdVerb;
+        // CommandStore MUIVerb 可能是间接字符串（@dll,-id），需 resolveIndirect 解析
+        if (cmdVerb.startsWith('@') || cmdVerb.startsWith('ms-resource:')) {
+          const resolved = this.win32.resolveIndirect(cmdVerb);
+          if (resolved && resolved.length >= 2) {
+            log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore resolved): "${resolved}"`);
+            return resolved;
+          }
+        } else {
+          log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore): "${cmdVerb}"`);
+          return cmdVerb;
+        }
       }
 
       // Level 2: CLSID 默认值

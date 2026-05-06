@@ -67,6 +67,7 @@ export interface PsRawShellExtItem {
   dllPath: string | null;
   dllFileDescription: string | null;
   dllProductName: string | null;
+  progIdName: string | null;
   siblingMUIVerb: string | null;
   registryKey: string;
 }
@@ -243,6 +244,14 @@ export class ShellExtNameResolver {
         } else {
           log.debug(`[NameResolver] ${fallback} → Level 1.7 (CommandStore): "${cmdVerb}"`);
           return cmdVerb;
+        }
+      }
+
+      // Level 1.6: ProgID → 应用程序名（在 CommandStore 之后、plain text 之前）
+      if (raw.progIdName && raw.progIdName.length >= 2) {
+        if (!isUselessPlain(raw.progIdName, fallback) && !isGenericName(raw.progIdName)) {
+          log.debug(`[NameResolver] ${fallback} → Level 1.6 (ProgID): "${raw.progIdName}"`);
+          return raw.progIdName;
         }
       }
 

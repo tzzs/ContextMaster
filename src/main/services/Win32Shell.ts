@@ -65,8 +65,9 @@ export class Win32Shell implements IWin32Shell {
       const kernel32 = koffi.load('kernel32.dll');
       const getLangId = kernel32.func('__stdcall', 'GetUserDefaultUILanguage', 'uint16', []);
       this.uiLangId = getLangId() & 0xFF;
+      log.info(`[Win32Shell] Initialized OK — koffiAvailable=true, uiLanguage=${this.uiLanguage}`);
     } catch (e) {
-      log.error('[Win32Shell] Failed to initialize koffi FFI:', String(e));
+      log.error(`[Win32Shell] FAILED — koffiAvailable=false, reason: ${String(e)}`);
       this.koffiAvailable = false;
       this.uiLangId = 0x09;
     }

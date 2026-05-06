@@ -5,10 +5,14 @@ import { IPC } from '../../shared/ipc-channels';
 import { isAdmin, restartAsAdmin } from '../utils/AdminHelper';
 import { wrapHandler } from '../utils/ipcWrapper';
 import log, { getLogDir } from '../utils/logger';
+import type { IWin32Shell } from '../services/Win32Shell';
 
 const execFileAsync = promisify(execFile);
 
-export function registerSystemHandlers(): void {
+export function registerSystemHandlers(
+  win32Shell?: IWin32Shell,
+  cmdStoreSize?: number,
+): void {
   ipcMain.handle(
     IPC.SYS_IS_ADMIN,
     wrapHandler(() => {
@@ -111,6 +115,51 @@ export function registerSystemHandlers(): void {
         default:
           log.info(prefix, message);
       }
+    })
+  );
+
+  ipcMain.handle(
+    IPC.SYS_DIAGNOSE,
+    wrapHandler(() => {
+      const result: Record<string, unknown> = {
+        koffiAvailable: false,
+        resolveIndirectResult: null,
+        resolveIndirectError: null,
+        fileVersionResult: null,
+        fileVersionError: null,
+        uiLanguage: 'unknown',
+        cmdStoreSize: cmdStoreSize ?? 0,
+      };
+
+      if (!win32Shell) {
+        result.resolveIndirectError = 'Win32Shell not injected';
+        return result;
+      }
+
+      result.koffiAvailable = true;
+      result.uiLanguage = win32Shell.uiLanguage;
+
+      // 测试 SHLoadIndirectString
+      try {
+        const resolved = win32Shell.resolveIndirect('@shell32.dll,-37423');
+        result.resolveIndirectResult = resolved;
+        log.info(`[Diagnose] resolveIndirect test: "${resolved}"`);
+      } catch (e) {
+        result.resolveIndirectError = String(e);
+        log.error('[Diagnose] resolveIndirect test failed:', e);
+      }
+
+      // 测试 GetFileVersionInfo
+      try {
+        const fv = win32Shell.getFileVersionInfo('C:\\Windows\\System32\\shell32.dll');
+        result.fileVersionResult = fv;
+        log.info(`[Diagnose] getFileVersionInfo test: "${fv}"`);
+      } catch (e) {
+        result.fileVersionError = String(e);
+        log.error('[Diagnose] getFileVersionInfo test failed:', e);
+      }
+
+      return result;
     })
   );
 

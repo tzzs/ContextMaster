@@ -466,6 +466,19 @@
           </div>
 
           <div class="settings-section">
+            <div class="settings-header">诊断 (Diagnostics)</div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label">koffi FFI 自检</div>
+                <div class="setting-desc" id="diagnoseResult" style="font-family:Consolas;font-size:11px;white-space:pre-wrap;max-height:200px;overflow:auto;">点击按钮检测 SHLoadIndirectString 和 GetFileVersionInfo 是否正常</div>
+              </div>
+              <div class="setting-control">
+                <button class="btn btn-secondary" onclick="window._settingsPage.runDiagnose()">运行诊断</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
             <div class="settings-header" data-i18n="settings.about.title">关于</div>
             <div class="setting-row">
               <div class="setting-info">

@@ -63,9 +63,11 @@ export class PowerShellBridge {
     await this.acquireSlot(priority);
     try {
       log.debug('[PS] execute:', script.substring(0, 200));
+      // 强制 PS 输出 UTF-8 编码，避免中文乱码
+      const utf8Script = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n' + script;
       const { stdout, stderr } = await execFileAsync(
         PS_EXE,
-        ['-NonInteractive', '-NoProfile', '-OutputFormat', 'Text', '-Command', script],
+        ['-NonInteractive', '-NoProfile', '-OutputFormat', 'Text', '-Command', utf8Script],
         { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
       );
 
@@ -103,6 +105,7 @@ export class PowerShellBridge {
     // 包装原始脚本：捕获原始 JSON 输出（脚本本身已输出 JSON），写入 resultFile
     const resultFilePs = resultFile.replace(/'/g, "''");
     const wrappedScript2 = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 try {
   $__out = & {

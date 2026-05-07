@@ -312,6 +312,17 @@ $result = @($handlers | ForEach-Object {
       $smv = (Get-Item -LiteralPath $siblingVerbPath).GetValue('MUIVerb')
       if ($smv) { $siblingMUIVerb = [string]$smv }
     }
+    # 回退：反向扫描 shell verbs，查找 CommandStateHandler/DelegateExecute = $actualClsid
+    if (-not $siblingMUIVerb -and $actualClsid) {
+      Get-ChildItem -LiteralPath $shellPath -ErrorAction SilentlyContinue | ForEach-Object {
+        $csh = $_.GetValue('CommandStateHandler')
+        $de  = $_.GetValue('DelegateExecute')
+        if (($csh -eq $actualClsid) -or ($de -eq $actualClsid)) {
+          $mv = $_.GetValue('MUIVerb')
+          if ($mv) { $siblingMUIVerb = [string]$mv }
+        }
+      }
+    }
   }
   $isEnabled = -not $handlerKeyName.StartsWith('-')
   $regKey = '${shellexSubPath}\\' + $cleanName

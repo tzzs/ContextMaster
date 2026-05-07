@@ -2,6 +2,8 @@ import '../api/bridge';
 import type { BackupSnapshot } from '../../shared/types';
 import { BackupType } from '../../shared/enums';
 import { t, registerRefreshCallback } from '../i18n';
+import { escapeHtml } from '../utils/html';
+import { showAlert, showConfirm, showPrompt } from '../utils/dialog';
 
 let backups: BackupSnapshot[] = [];
 
@@ -14,7 +16,7 @@ registerRefreshCallback(refreshBackupContent);
 export async function loadBackups(): Promise<void> {
   const result = await window.api.getBackups();
   if (!result.success) {
-    alert(`${t('backup.loadFailed')}: ${result.error}`);
+    await showAlert(`${t('backup.loadFailed')}: ${result.error}`);
     return;
   }
   backups = result.data;
@@ -74,7 +76,7 @@ export function renderBackup(): void {
 }
 
 export async function createBackup(): Promise<void> {
-  const name = prompt(
+  const name = await showPrompt(
     t('backup.enterNote'),
     `${t('backup.manualBackup')} · ${new Date().toLocaleDateString('zh-CN')}`
   );
@@ -82,7 +84,7 @@ export async function createBackup(): Promise<void> {
 
   const result = await window.api.createBackup(name);
   if (!result.success) {
-    alert(`${t('backup.createFailed')}: ${result.error}`);
+    await showAlert(`${t('backup.createFailed')}: ${result.error}`);
     return;
   }
   backups.unshift(result.data);
@@ -97,7 +99,7 @@ export async function restoreBackup(id: number): Promise<void> {
 
   const diffResult = await window.api.previewRestoreDiff(id);
   if (!diffResult.success) {
-    alert(`${t('backup.previewFailed')}: ${diffResult.error}`);
+    await showAlert(`${t('backup.previewFailed')}: ${diffResult.error}`);
     return;
   }
   const diffCount = diffResult.data.length;
@@ -105,12 +107,12 @@ export async function restoreBackup(id: number): Promise<void> {
     ? `${t('backup.willRestore')}「${b.name}」\n${t('backup.itemsWillChange', { count: diffCount })}\n${t('backup.autoSnapshot')}\n\n${t('backup.confirmContinue')}`
     : `${t('backup.noDiff')}「${b.name}」${t('backup.noNeedRestore')}`;
 
-  if (diffCount === 0) { alert(confirmMsg); return; }
-  if (!confirm(confirmMsg)) return;
+  if (diffCount === 0) { await showAlert(confirmMsg); return; }
+  if (!await showConfirm(confirmMsg)) return;
 
   const result = await window.api.restoreBackup(id);
   if (!result.success) {
-    alert(`${t('backup.restoreFailed')}: ${result.error}`);
+    await showAlert(`${t('backup.restoreFailed')}: ${result.error}`);
     return;
   }
   await loadBackups();
@@ -121,14 +123,14 @@ export async function restoreBackup(id: number): Promise<void> {
 export async function exportBackup(id: number): Promise<void> {
   const result = await window.api.exportBackup(id);
   if (!result.success) {
-    alert(`${t('backup.exportFailed')}: ${result.error}`);
+    await showAlert(`${t('backup.exportFailed')}: ${result.error}`);
   }
 }
 
 export async function importBackup(): Promise<void> {
   const result = await window.api.importBackup();
   if (!result.success) {
-    if (result.error !== t('backup.noFileSelected')) alert(`${t('backup.importFailed')}: ${result.error}`);
+    if (result.error !== t('backup.noFileSelected')) await showAlert(`${t('backup.importFailed')}: ${result.error}`);
     return;
   }
   backups.unshift(result.data);
@@ -138,9 +140,9 @@ export async function importBackup(): Promise<void> {
 }
 
 export async function deleteBackup(id: number): Promise<void> {
-  if (!confirm(t('backup.confirmDelete'))) return;
+  if (!await showConfirm(t('backup.confirmDelete'))) return;
   const result = await window.api.deleteBackup(id);
-  if (!result.success) { alert(`${t('backup.deleteFailed')}: ${result.error}`); return; }
+  if (!result.success) { await showAlert(`${t('backup.deleteFailed')}: ${result.error}`); return; }
   backups = backups.filter((b) => b.id !== id);
   renderBackup();
 }
@@ -157,10 +159,6 @@ function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString('zh-CN').replace(/\//g, '-');
   } catch { return iso; }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 const backupPageApi = { createBackup, restoreBackup, exportBackup, importBackup, deleteBackup };

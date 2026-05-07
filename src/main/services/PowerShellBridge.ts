@@ -279,6 +279,14 @@ $result = @($handlers | ForEach-Object {
         $dllRaw = (Get-Item -LiteralPath $inprocPath).GetValue('')
         if ($dllRaw) { $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllRaw) }
       }
+      # CLSID\Shell 子键的 MUIVerb（COM 对象自身注册的 verb）
+      $clsidShellPath = $clsidPath + '\\Shell'
+      if (Test-Path -LiteralPath $clsidShellPath) {
+        Get-ChildItem -LiteralPath $clsidShellPath -ErrorAction SilentlyContinue | ForEach-Object {
+          $shellMv = $_.GetValue('MUIVerb')
+          if ($shellMv -and -not $clsidMUIVerb) { $clsidMUIVerb = [string]$shellMv }
+        }
+      }
       # ProgID → 应用程序名（用于 Level 1.6）
       $progIdVal = $clsidKey.GetValue('ProgID')
       if ($progIdVal) {
@@ -317,7 +325,8 @@ $result = @($handlers | ForEach-Object {
       Get-ChildItem -LiteralPath $shellPath -ErrorAction SilentlyContinue | ForEach-Object {
         $csh = $_.GetValue('CommandStateHandler')
         $de  = $_.GetValue('DelegateExecute')
-        if (($csh -eq $actualClsid) -or ($de -eq $actualClsid)) {
+        $ech = $_.GetValue('ExplorerCommandHandler')
+        if (($csh -eq $actualClsid) -or ($de -eq $actualClsid) -or ($ech -eq $actualClsid)) {
           $mv = $_.GetValue('MUIVerb')
           if ($mv) { $siblingMUIVerb = [string]$mv }
         }

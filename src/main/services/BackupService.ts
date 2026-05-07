@@ -24,11 +24,10 @@ export class BackupService {
   ) {}
 
   async createBackup(name: string, type = BackupType.Manual): Promise<BackupSnapshot> {
-    const allItems: MenuItemEntry[] = [];
-    for (const scene of Object.values(MenuScene)) {
-      const items = await this.menuManager.getMenuItems(scene);
-      allItems.push(...items);
-    }
+    const start = Date.now();
+    const scenes = Object.values(MenuScene) as MenuScene[];
+    const itemsByScene = await Promise.all(scenes.map((s) => this.menuManager.getMenuItems(s)));
+    const allItems: MenuItemEntry[] = itemsByScene.flat();
 
     const jsonData = JSON.stringify(allItems);
     const checksum = createHash('sha256').update(jsonData).digest('hex');
@@ -42,11 +41,13 @@ export class BackupService {
     });
 
     this.history.recordOperation(OperationType.Backup, name, '', '', checksum);
-    log.info(`Backup created: ${name} (${allItems.length} items)`);
+    const elapsed = Date.now() - start;
+    log.info(`[Backup] Backup created: ${name} (${allItems.length} items) in ${elapsed}ms`);
     return snapshot;
   }
 
   async restoreBackup(snapshotId: number): Promise<void> {
+    const start = Date.now();
     const snapshot = this.repo.findById(snapshotId);
     if (!snapshot) throw new Error('找不到备份快照');
 
@@ -57,7 +58,6 @@ export class BackupService {
       throw new Error('备份校验失败，文件可能已被篡改');
     }
 
-    // 还原前先自动创建备份
     await this.createBackup(
       `AutoBackup_BeforeRestore_${new Date().toISOString().replace(/[:.]/g, '-')}`,
       BackupType.Auto
@@ -87,18 +87,24 @@ export class BackupService {
     if (toDisable.length) await this.menuManager.batchDisable(toDisable);
 
     this.history.recordOperation(OperationType.Restore, snapshot.name, '', '', snapshotId.toString());
-    log.info(`Restore completed from backup: ${snapshot.name}`);
+    const elapsed = Date.now() - start;
+    log.info(`[Backup] Restore completed from backup: ${snapshot.name} in ${elapsed}ms`);
   }
 
   async deleteBackup(id: number): Promise<void> {
+    const snapshot = this.repo.findById(id);
+    if (!snapshot) throw new Error(`备份快照不存在: id=${id}`);
     this.repo.delete(id);
+    log.warn(`[Backup] Deleted backup: id=${id}, name=${snapshot.name}`);
   }
 
   getAllBackups(): BackupSnapshot[] {
+    log.debug('[Backup] Getting all backups');
     return this.repo.findAll();
   }
 
   async previewRestoreDiff(snapshotId: number): Promise<RestoreDiffItem[]> {
+    log.debug(`[Backup] Previewing restore diff: snapshotId=${snapshotId}`);
     const snapshot = this.repo.findById(snapshotId);
     if (!snapshot) throw new Error('找不到备份快照');
 
@@ -115,6 +121,7 @@ export class BackupService {
         diff.push({ current, backup: backupItem });
       }
     }
+    log.debug(`[Backup] Preview diff result: ${diff.length} items changed`);
     return diff;
   }
 
@@ -147,6 +154,15 @@ export class BackupService {
 
     const filePath = filePaths[0];
     const jsonData = await fs.readFile(filePath, 'utf-8');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonData);
+    } catch {
+      throw new Error('导入文件不是有效的 JSON 格式');
+    }
+    if (!Array.isArray(parsed)) throw new Error('导入文件格式无效：必须是数组');
+
     const checksum = createHash('sha256').update(jsonData).digest('hex');
 
     const snapshot = this.repo.insert({

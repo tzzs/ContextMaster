@@ -75,8 +75,14 @@ const api = {
   copyToClipboard: (text: string) =>
     invoke<boolean>(IPC.SYS_COPY_CLIPBOARD, text),
 
+  diagnose: () =>
+    invoke<Record<string, unknown>>(IPC.SYS_DIAGNOSE),
+
   openExternal: (url: string) =>
     invoke<void>(IPC.SYS_OPEN_EXTERNAL, url),
+
+  logToFile: (level: 'info' | 'warn' | 'error', message: string) =>
+    ipcRenderer.invoke(IPC.SYS_LOG_TO_FILE, level, message),
 
   // ── Window ──
   minimizeWindow: () => ipcRenderer.invoke(IPC.WIN_MINIMIZE),

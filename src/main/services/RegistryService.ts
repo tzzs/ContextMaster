@@ -1,6 +1,8 @@
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { PowerShellBridge } from './PowerShellBridge';
+import { RegistryCache } from '../utils/RegistryCache';
+import { ShellExtNameResolver, CommandStoreIndex, PsRawClassicItem, PsRawShellExtItem } from './ShellExtNameResolver';
 import log from '../utils/logger';
 
 // 与 C# RegistryService._sceneRegistryPaths 完全一致
@@ -26,61 +28,116 @@ const SCENE_SHELLEX_PATHS: Record<MenuScene, string> = {
 // 完整 HKCR 前缀（用于显示）
 const HKCR_PREFIX = 'HKEY_CLASSES_ROOT';
 
-interface PsMenuItemRaw {
-  name: string;
-  command: string;
-  iconPath: string | null;
-  isEnabled: boolean;
-  source: string;
-  registryKey: string;
-  subKeyName: string;
-  itemType?: string;  // 'ShellExt' for shell extensions
-}
-
 export class RegistryService {
   private readonly ps: PowerShellBridge;
+  private readonly cache: RegistryCache;
+  private readonly resolver: ShellExtNameResolver;
+  private readonly cmdStoreIndex: CommandStoreIndex;
   /** 事务回滚数据：registryKey → 原始 isEnabled */
   private rollbackData = new Map<string, boolean>();
   private inTransaction = false;
   private nextId = 1;
 
-  constructor(ps: PowerShellBridge) {
+  constructor(
+    ps: PowerShellBridge,
+    resolver: ShellExtNameResolver,
+    cmdStoreIndex: CommandStoreIndex,
+    cache?: RegistryCache,
+  ) {
     this.ps = ps;
+    this.resolver = resolver;
+    this.cmdStoreIndex = cmdStoreIndex;
+    this.cache = cache ?? new RegistryCache();
   }
 
   /**
    * 获取指定场景下的所有菜单条目（Classic Shell + Shell 扩展）
+   * 优先从缓存读取，缓存未命中时执行 PowerShell 查询
    */
-  async getMenuItems(scene: MenuScene): Promise<MenuItemEntry[]> {
+  async getMenuItems(scene: MenuScene, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
+    // 尝试从缓存读取
+    const cached = this.cache.get(scene);
+    if (cached) {
+      log.debug(`RegistryService: Returning cached data for ${scene} (${cached.length} items)`);
+      return cached;
+    }
+
     const basePath = SCENE_REGISTRY_PATHS[scene];
     const shellexPath = SCENE_SHELLEX_PATHS[scene];
-    try {
-      // 读取 Classic Shell 命令
-      const script = this.ps.buildGetItemsScript(basePath);
-      const raw = await this.ps.execute<PsMenuItemRaw[]>(script);
-      const items = Array.isArray(raw) ? raw : (raw ? [raw] : []);
 
-      // 读取 Shell 扩展（COM ContextMenuHandlers），失败不阻断主流程
-      let shellexItems: PsMenuItemRaw[] = [];
-      try {
-        const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
-        const shellexRaw = await this.ps.execute<PsMenuItemRaw[]>(shellexScript);
-        shellexItems = Array.isArray(shellexRaw) ? shellexRaw : (shellexRaw ? [shellexRaw] : []);
-      } catch (e) {
-        log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
+    try {
+      // 并行读取 Classic Shell 命令 + Shell 扩展（COM ContextMenuHandlers）
+      const script = this.ps.buildGetItemsScript(basePath);
+      const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
+      const [raw, shellexRaw] = await Promise.all([
+        this.ps.execute<PsRawClassicItem[]>(script, priority),
+        this.ps.execute<PsRawShellExtItem[]>(shellexScript, priority).catch((e) => {
+          log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
+          return [] as PsRawShellExtItem[];
+        }),
+      ]);
+      const classicItems = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      const shellexItems = Array.isArray(shellexRaw) ? shellexRaw : [];
+
+      // Classic Shell 条目：通过 resolver 解析名称（保护：单条失败不影响整体）
+      const classicEntries: MenuItemEntry[] = classicItems.map((r: PsRawClassicItem) => {
+        let name: string;
+        try {
+          name = this.cleanDisplayName(this.resolver.resolveClassicName(r));
+        } catch (e) {
+          log.warn(`[RegistryService] resolveClassicName failed for "${r.subKeyName}":`, String(e));
+          name = this.cleanDisplayName(r.subKeyName);
+        }
+        return {
+          id: this.nextId++,
+          name,
+          command: r.command,
+          iconPath: r.rawIcon,
+          isEnabled: r.isEnabled,
+          source: '',
+          menuScene: scene,
+          registryKey: r.registryKey,
+          type: r.command && r.command.trim() ? MenuItemType.Custom : MenuItemType.System,
+          dllPath: null,
+        };
+      });
+
+      // Shell 扩展条目：通过 resolver 解析名称（保护：单条失败不影响整体）
+      const shellexEntries: MenuItemEntry[] = shellexItems.map((r: PsRawShellExtItem) => {
+        let name: string;
+        try {
+          name = this.cleanDisplayName(this.resolver.resolveExtName(r, this.cmdStoreIndex));
+        } catch (e) {
+          log.warn(`[RegistryService] resolveExtName failed for "${r.cleanName}":`, String(e));
+          name = this.cleanDisplayName(r.cleanName);
+        }
+        return {
+          id: this.nextId++,
+          name,
+          command: r.actualClsid,
+          iconPath: null,
+          isEnabled: r.isEnabled,
+          source: r.handlerKeyName,
+          menuScene: scene,
+          registryKey: r.registryKey,
+          type: MenuItemType.ShellExt,
+          dllPath: r.dllPath ?? null,
+        };
+      });
+
+      const result = [...classicEntries, ...shellexEntries];
+
+      // 逐条诊断日志: 打印每个 ShellExt 条目的解析结果和原始数据
+      for (let i = 0; i < shellexEntries.length; i++) {
+        const entry = shellexEntries[i];
+        const raw = shellexItems[i];
+        log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" clsidMUI="${raw.clsidMUIVerb || ''}" progId="${raw.progIdName || ''}" dllDesc="${raw.dllFileDescription || ''}" dllProd="${raw.dllProductName || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
       }
 
-      return [...items, ...shellexItems].map((r) => ({
-        id: this.nextId++,
-        name: r.name,
-        command: r.command,
-        iconPath: r.iconPath,
-        isEnabled: r.isEnabled,
-        source: r.source || this.inferSource(r.subKeyName),
-        menuScene: scene,
-        registryKey: r.registryKey,
-        type: this.determineType(r.itemType),
-      }));
+      // 写入缓存
+      this.cache.set(scene, result);
+      
+      return result;
     } catch (e) {
       log.error(`getMenuItems(${scene}) failed:`, e);
       throw new Error(`读取注册表场景 ${scene} 失败: ${(e as Error).message}`);
@@ -130,13 +187,21 @@ export class RegistryService {
   async rollback(): Promise<void> {
     if (!this.inTransaction) return;
     log.warn('Rolling back registry changes...');
+    const failedItems: string[] = [];
     try {
       for (const [key, wasEnabled] of this.rollbackData) {
-        await this.setItemEnabledInternal(key, wasEnabled);
+        try {
+          await this.setItemEnabledInternal(key, wasEnabled);
+        } catch (e) {
+          failedItems.push(`${key}: ${String(e)}`);
+        }
       }
     } finally {
       this.inTransaction = false;
       this.rollbackData.clear();
+    }
+    if (failedItems.length > 0) {
+      throw new Error(`部分项回滚失败:\n${failedItems.join('\n')}`);
     }
   }
 
@@ -155,6 +220,34 @@ export class RegistryService {
     return `${HKCR_PREFIX}\\${SCENE_REGISTRY_PATHS[scene]}`;
   }
 
+  /**
+   * 清除指定场景的缓存
+   */
+  invalidateCache(scene: MenuScene): void {
+    this.cache.invalidate(scene);
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  invalidateAllCache(): void {
+    this.cache.invalidateAll();
+  }
+
+  /**
+   * 获取缓存统计信息
+   */
+  getCacheStats(): ReturnType<RegistryCache['getStats']> {
+    return this.cache.getStats();
+  }
+
+  /**
+   * 打印缓存统计日志
+   */
+  logCacheStats(): void {
+    this.cache.logStats();
+  }
+
   private async setItemEnabledInternal(registryKey: string, enabled: boolean): Promise<void> {
     if (this.isShellExtKey(registryKey)) {
       const script = this.ps.buildShellExtToggleScript(registryKey, enabled);
@@ -170,12 +263,15 @@ export class RegistryService {
     return registryKey.includes('shellex') && registryKey.includes('ContextMenuHandlers');
   }
 
-private inferSource(subKeyName: string): string {
-    return subKeyName || '';
+  private cleanDisplayName(name: string): string {
+    if (!name) return name;
+    return name
+      .replace(/\(&\w\)/g, '')   // ① 先处理带括号加速键整体：(&R)、(&E)、(&V)
+      .replace(/\(\w\)/g, '')    // ② 单字母括号：(P)、(D)
+      .replace(/&\w/g, '')       // ③ 裸加速键：&O、&L（兜底）
+      .replace(/\(\s*\)/g, '')   // ④ 空括号兜底（防止顺序问题留下残留）
+      .replace(/\s+/g, ' ')      // ⑤ 规范化多余空白
+      .trim();
   }
 
-  private determineType(itemType?: string): MenuItemType {
-    if (itemType === 'ShellExt') return MenuItemType.ShellExt;
-    return MenuItemType.System;
-  }
 }

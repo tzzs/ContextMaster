@@ -2,6 +2,7 @@ import { OperationType, MenuScene, MenuItemType } from '../../shared/enums';
 import { OperationRecord, MenuItemEntry } from '../../shared/types';
 import { OperationRecordRepo } from '../data/repositories/OperationRecordRepo';
 import { MenuManagerService } from './MenuManagerService';
+import log from '../utils/logger';
 
 export class OperationHistoryService {
   constructor(private readonly repo: OperationRecordRepo) {}
@@ -24,17 +25,15 @@ export class OperationHistoryService {
   }
 
   getAllRecords(): OperationRecord[] {
+    log.debug('[History] Getting all records');
     return this.repo.findAll();
   }
 
   clearAll(): void {
+    log.warn('[History] Clearing all operation records');
     this.repo.deleteAll();
   }
 
-  /**
-   * 单条撤销：根据操作类型执行反向操作
-   * 仅支持 Enable / Disable
-   */
   async undoOperation(
     recordId: number,
     menuManager: MenuManagerService
@@ -50,6 +49,8 @@ export class OperationHistoryService {
     }
 
     const wasEnabled = record.operationType === OperationType.Enable;
+    log.info(`[History] Undo operation: recordId=${recordId}, type=${record.operationType}, target=${record.targetEntryName}, reverting to ${wasEnabled ? 'disabled' : 'enabled'}`);
+
     const tempItem: MenuItemEntry = {
       id: -1,
       name: record.targetEntryName,
@@ -67,20 +68,18 @@ export class OperationHistoryService {
     } else {
       await menuManager.enableItem(tempItem);
     }
+
+    menuManager.invalidateCache(tempItem.menuScene);
+    log.info(`[History] Undo completed: ${record.targetEntryName} -> ${wasEnabled ? 'disabled' : 'enabled'}`);
   }
 }
 
-/** 与 C# DetermineSceneFromRegistryKey 逻辑一致 */
 function determineSceneFromRegistryKey(registryKey: string): MenuScene {
-  if (registryKey.includes('DesktopBackground')) return MenuScene.Desktop;
-  if (registryKey.includes('*\\')) return MenuScene.File;
-  if (
-    registryKey.includes('Directory\\shell') &&
-    !registryKey.includes('Directory\\Background')
-  )
-    return MenuScene.Folder;
-  if (registryKey.includes('Drive\\shell')) return MenuScene.Drive;
   if (registryKey.includes('Directory\\Background')) return MenuScene.DirectoryBackground;
-  if (registryKey.includes('CLSID')) return MenuScene.RecycleBin;
-  return MenuScene.File;
+  if (registryKey.includes('DesktopBackground')) return MenuScene.Desktop;
+  if (registryKey.includes('CLSID\\{645FF040')) return MenuScene.RecycleBin;
+  if (registryKey.includes('Drive\\shell')) return MenuScene.Drive;
+  if (registryKey.includes('Directory\\shell')) return MenuScene.Folder;
+  if (registryKey.includes('*\\')) return MenuScene.File;
+  throw new Error(`无法从注册表路径确定场景: ${registryKey}`);
 }

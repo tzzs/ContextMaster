@@ -28,6 +28,7 @@ describe('IPC Registry Handlers', () => {
       toggleItem: vi.fn(),
       batchEnable: vi.fn(),
       batchDisable: vi.fn(),
+      invalidateCache: vi.fn(),
     } as MockedObject<MenuManagerService>;
 
     registerRegistryHandlers(mockMenuManager);
@@ -64,7 +65,7 @@ describe('IPC Registry Handlers', () => {
 
       const result = await handler({}, MenuScene.Desktop);
 
-      expect(mockMenuManager.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop);
+      expect(mockMenuManager.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop, false, 'high');
       expect(result).toEqual(mockItems);
     });
   });

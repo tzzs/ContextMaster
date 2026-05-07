@@ -29,11 +29,13 @@ export interface WindowApi {
   importBackup(): Promise<IpcResult<BackupSnapshot>>;
   previewRestoreDiff(snapshotId: number): Promise<IpcResult<RestoreDiffItem[]>>;
 
+  diagnose(): Promise<IpcResult<Record<string, unknown>>>;
   isAdmin(): Promise<IpcResult<boolean>>;
   restartAsAdmin(): Promise<IpcResult<boolean>>;
   openRegedit(fullRegPath: string): Promise<IpcResult<boolean>>;
   copyToClipboard(text: string): Promise<IpcResult<boolean>>;
   openLogDir(): Promise<IpcResult<boolean>>;
+  logToFile(level: 'info' | 'warn' | 'error', message: string): Promise<void>;
 
   minimizeWindow(): Promise<void>;
   maximizeWindow(): Promise<void>;

@@ -1,0 +1,92 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # =====================================================
+  # Job 1: 创建/更新 Release PR，或发布 GitHub Release
+  # =====================================================
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # =====================================================
+  # Job 2: Release 创建后构建 Windows 安装包并上传产物
+  # =====================================================
+  build-and-upload:
+    name: Build & Upload Release Assets
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: pnpm run make
+
+      - name: Upload installer to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          echo "Uploading assets for release: $TAG"
+
+          # 上传 Squirrel 安装包（Setup.exe）
+          for f in out/make/squirrel.windows/**/*.exe; do
+            [ -f "$f" ] && echo "Uploading: $f" && gh release upload "$TAG" "$f" --clobber
+          done
+
+          # 上传 nupkg（增量更新包）
+          for f in out/make/squirrel.windows/**/*.nupkg; do
+            [ -f "$f" ] && echo "Uploading: $f" && gh release upload "$TAG" "$f" --clobber
+          done
+
+          echo "Upload complete."

@@ -267,13 +267,20 @@ Level 1.7: cmdStoreVerbs[CLSID] = "固定到任务栏" ✓
 
 ---
 
-## CmHelper 编译与缓存
+## koffi FFI 与 SHLoadIndirectString
 
-CmHelper 是一个 C# 类，在脚本运行时动态编译（或从缓存加载）。缓存路径：`%LOCALAPPDATA%\ContextMaster\CmHelper.dll`。
+`SHLoadIndirectString` 通过 TypeScript `koffi` 库直接调用 `shlwapi.dll`，
+封装在 `src/main/services/Win32Shell.ts`。
 
-**版本校验**：加载 DLL 后立即检查 `[CmHelper]::Ver == "2026.3"`，不匹配时重新编译。这确保代码变更后自动更新缓存。
+DLL 版本资源通过 PowerShell `[System.Diagnostics.FileVersionInfo]::GetVersionInfo`
+采集（天然支持当前 UI 语言），不依赖 C# 运行时编译。
 
-**编译失败时的降级行为**：
-- `ResolveIndirect` 不可用 → Level 0、Level 1（间接格式）、Level 1.3（间接格式）、Level 1.5（间接格式）失败
-- `GetLocalizedVerStrings` 不可用 → Level 2.5 降级为 `FileVersionInfo`（仅当前 locale）
+**优势**：
+- 不依赖 .NET SDK 或运行时编译（C# `CmHelper` 已移除）
+- 所有名称解析逻辑在 TypeScript 侧（`ShellExtNameResolver`），便于测试和调试
+- PS 脚本只负责注册表数据采集 + DLL FileVersionInfo 读取
+
+**koffi 不可用时的降级行为**：
+- `resolveIndirect` 失败 → Level 0、Level 1/1.3/1.5（间接格式）、Level 1.7（间接格式）全部跳过
+- DLL FileVersionInfo 仍通过 PS 脚本采集（Level 2.5），不受影响
 - 其余 Level（plain 字符串路径）不受影响

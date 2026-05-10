@@ -4,6 +4,11 @@ import type { MenuItemEntry, ToggleItemParams } from '../../shared/types';
 import { t, registerRefreshCallback } from '../i18n';
 import { escapeHtml } from '../utils/html';
 
+interface MainWindow extends Window {
+  showUndo?: (msg: string, itemId: number) => void;
+  invalidateAllScenesCache?: () => void;
+}
+
 export const SCENE_REG_ROOTS: Record<MenuScene, string> = {
   [MenuScene.Desktop]:            'HKEY_CLASSES_ROOT\\DesktopBackground\\Shell',
   [MenuScene.File]:               'HKEY_CLASSES_ROOT\\*\\shell',
@@ -228,9 +233,9 @@ export async function toggleItem(id: number): Promise<void> {
   rendererCache.delete(item.menuScene);
   renderItems();
   const action = item.isEnabled ? t('history.operation.enable') : t('history.operation.disable');
-  (window as Window & { showUndo?: (msg: string, itemId: number) => void; invalidateAllScenesCache?: () => void })
-    .showUndo?.(`${t('main.actionDone')}${action}「${item.name}」`, id);
-  (window as Window & { invalidateAllScenesCache?: () => void }).invalidateAllScenesCache?.();
+  const win = window as MainWindow;
+  win.showUndo?.(`${t('main.actionDone')}${action}「${item.name}」`, id);
+  win.invalidateAllScenesCache?.();
 
   updateStatusBarFromCurrent();
   if (selectedItemId === id) showDetail(id);

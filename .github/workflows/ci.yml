@@ -147,51 +147,7 @@ jobs:
       run: pnpm run package
 
   # =====================================================
-  # Job 4: 发布检查 (Release Check)
-  # =====================================================
-  release-check:
-    name: Release Check
-    runs-on: windows-latest
-    timeout-minutes: 30
-    needs: [unit-tests, build-test]
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js ${{ env.NODE_VERSION }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        run_install: false
-
-    - name: Get pnpm store directory
-      shell: bash
-      run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-    - name: Setup pnpm cache
-      uses: actions/cache@v4
-      with:
-        path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-
-    - name: Build and package
-      run: |
-        pnpm run package
-        pnpm run make
-
-  # =====================================================
-  # Job 5: 测试结果通知 (Notifications)
+  # Job 4: 测试结果通知 (Notifications)
   # =====================================================
   test-notify:
     name: Test Results Summary

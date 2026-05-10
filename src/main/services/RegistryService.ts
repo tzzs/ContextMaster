@@ -1,7 +1,6 @@
 import { MenuScene, MenuItemType } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { PowerShellBridge } from './PowerShellBridge';
-import { RegistryCache } from '../utils/RegistryCache';
 import { ShellExtNameResolver, CommandStoreIndex, PsRawClassicItem, PsRawShellExtItem } from './ShellExtNameResolver';
 import log from '../utils/logger';
 
@@ -30,10 +29,8 @@ const HKCR_PREFIX = 'HKEY_CLASSES_ROOT';
 
 export class RegistryService {
   private readonly ps: PowerShellBridge;
-  private readonly cache: RegistryCache;
   private readonly resolver: ShellExtNameResolver;
   private readonly cmdStoreIndex: CommandStoreIndex;
-  /** 事务回滚数据：registryKey → 原始 isEnabled */
   private rollbackData = new Map<string, boolean>();
   private inTransaction = false;
   private nextId = 1;
@@ -42,12 +39,10 @@ export class RegistryService {
     ps: PowerShellBridge,
     resolver: ShellExtNameResolver,
     cmdStoreIndex: CommandStoreIndex,
-    cache?: RegistryCache,
   ) {
     this.ps = ps;
     this.resolver = resolver;
     this.cmdStoreIndex = cmdStoreIndex;
-    this.cache = cache ?? new RegistryCache();
   }
 
   /**
@@ -55,13 +50,6 @@ export class RegistryService {
    * 优先从缓存读取，缓存未命中时执行 PowerShell 查询
    */
   async getMenuItems(scene: MenuScene, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
-    // 尝试从缓存读取
-    const cached = this.cache.get(scene);
-    if (cached) {
-      log.debug(`RegistryService: Returning cached data for ${scene} (${cached.length} items)`);
-      return cached;
-    }
-
     const basePath = SCENE_REGISTRY_PATHS[scene];
     const shellexPath = SCENE_SHELLEX_PATHS[scene];
 
@@ -134,9 +122,6 @@ export class RegistryService {
         log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" clsidMUI="${raw.clsidMUIVerb || ''}" progId="${raw.progIdName || ''}" dllDesc="${raw.dllFileDescription || ''}" dllProd="${raw.dllProductName || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
       }
 
-      // 写入缓存
-      this.cache.set(scene, result);
-      
       return result;
     } catch (e) {
       log.error(`getMenuItems(${scene}) failed:`, e);
@@ -218,34 +203,6 @@ export class RegistryService {
    */
   getFullRegistryPath(scene: MenuScene): string {
     return `${HKCR_PREFIX}\\${SCENE_REGISTRY_PATHS[scene]}`;
-  }
-
-  /**
-   * 清除指定场景的缓存
-   */
-  invalidateCache(scene: MenuScene): void {
-    this.cache.invalidate(scene);
-  }
-
-  /**
-   * 清除所有缓存
-   */
-  invalidateAllCache(): void {
-    this.cache.invalidateAll();
-  }
-
-  /**
-   * 获取缓存统计信息
-   */
-  getCacheStats(): ReturnType<RegistryCache['getStats']> {
-    return this.cache.getStats();
-  }
-
-  /**
-   * 打印缓存统计日志
-   */
-  logCacheStats(): void {
-    this.cache.logStats();
   }
 
   private async setItemEnabledInternal(registryKey: string, enabled: boolean): Promise<void> {

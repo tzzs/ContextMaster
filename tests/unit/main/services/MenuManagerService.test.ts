@@ -31,6 +31,9 @@ describe('MenuManagerService', () => {
       commitTransaction: vi.fn(),
       rollback: vi.fn(),
       invalidateCache: vi.fn(),
+      invalidateAllCache: vi.fn(),
+      getCacheStats: vi.fn(),
+      logCacheStats: vi.fn(),
     } as MockedObject<RegistryService>;
 
     mockHistory = {

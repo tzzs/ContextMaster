@@ -43,7 +43,8 @@ export function registerBackupHandlers(backup: BackupService): void {
     IPC.BACKUP_EXPORT,
     wrapHandler(async (event: Electron.IpcMainInvokeEvent, snapshotId: number) => {
       log.info(`[Backup] Exporting backup: snapshotId=${snapshotId}`);
-      const win = BrowserWindow.fromWebContents(event.sender)!;
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) throw new Error('当前窗口已关闭，无法进行文件操作');
       await backup.exportBackup(snapshotId, win);
       return true;
     })
@@ -53,7 +54,8 @@ export function registerBackupHandlers(backup: BackupService): void {
     IPC.BACKUP_IMPORT,
     wrapHandler(async (event: Electron.IpcMainInvokeEvent) => {
       log.info('[Backup] Importing backup');
-      const win = BrowserWindow.fromWebContents(event.sender)!;
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win) throw new Error('当前窗口已关闭，无法进行文件操作');
       return backup.importBackup(win);
     })
   );

@@ -75,15 +75,11 @@ export class OperationHistoryService {
 }
 
 function determineSceneFromRegistryKey(registryKey: string): MenuScene {
-  if (registryKey.includes('DesktopBackground')) return MenuScene.Desktop;
-  if (registryKey.includes('*\\')) return MenuScene.File;
-  if (
-    registryKey.includes('Directory\\shell') &&
-    !registryKey.includes('Directory\\Background')
-  )
-    return MenuScene.Folder;
-  if (registryKey.includes('Drive\\shell')) return MenuScene.Drive;
   if (registryKey.includes('Directory\\Background')) return MenuScene.DirectoryBackground;
-  if (registryKey.includes('CLSID')) return MenuScene.RecycleBin;
-  return MenuScene.File;
+  if (registryKey.includes('DesktopBackground')) return MenuScene.Desktop;
+  if (registryKey.includes('CLSID\\{645FF040')) return MenuScene.RecycleBin;
+  if (registryKey.includes('Drive\\shell')) return MenuScene.Drive;
+  if (registryKey.includes('Directory\\shell')) return MenuScene.Folder;
+  if (registryKey.includes('*\\')) return MenuScene.File;
+  throw new Error(`无法从注册表路径确定场景: ${registryKey}`);
 }

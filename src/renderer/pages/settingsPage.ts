@@ -79,10 +79,24 @@ export async function openLogDir(): Promise<void> {
   if (!result.success) alert(`打开日志目录失败: ${result.error}`);
 }
 
-const settingsPageApi = { 
-  requestAdminRestart, 
-  toggleSwitch, 
-  openLogDir 
+export async function runDiagnose(): Promise<void> {
+  const el = document.getElementById('diagnoseResult');
+  if (el) el.textContent = '诊断中...';
+
+  const result = await window.api.diagnose();
+  const text = result.success
+    ? JSON.stringify(result.data, null, 2)
+    : `IPC 失败: ${result.error}`;
+
+  if (el) el.textContent = text;
+  console.log('[Diagnose]', text);
+}
+
+const settingsPageApi = {
+  requestAdminRestart,
+  toggleSwitch,
+  openLogDir,
+  runDiagnose,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

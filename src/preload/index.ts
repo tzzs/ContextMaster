@@ -75,6 +75,9 @@ const api = {
   copyToClipboard: (text: string) =>
     invoke<boolean>(IPC.SYS_COPY_CLIPBOARD, text),
 
+  diagnose: () =>
+    invoke<Record<string, unknown>>(IPC.SYS_DIAGNOSE),
+
   openExternal: (url: string) =>
     invoke<void>(IPC.SYS_OPEN_EXTERNAL, url),
 

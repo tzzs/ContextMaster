@@ -65,7 +65,7 @@ describe('IPC Registry Handlers', () => {
 
       const result = await handler({}, MenuScene.Desktop);
 
-      expect(mockMenuManager.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop);
+      expect(mockMenuManager.getMenuItems).toHaveBeenCalledWith(MenuScene.Desktop, false, 'high');
       expect(result).toEqual(mockItems);
     });
   });

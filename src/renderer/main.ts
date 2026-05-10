@@ -2,7 +2,7 @@ import './api/bridge';
 import './styles/themes.css';
 import { MenuScene } from '../shared/enums';
 import type { MenuItemEntry } from '../shared/types';
-import { loadScene, preloadBadgeCounts, renderGlobalResults, restoreSceneTitle } from './pages/mainPage';
+import { loadScene, preloadBadgeCounts, renderGlobalResults, restoreSceneTitle, onNavigateAway } from './pages/mainPage';
 import { loadHistory, filterHistory, clearAllHistory } from './pages/historyPage';
 import { loadBackups, createBackup, importBackup } from './pages/backupPage';
 import { initSettings, requestAdminRestart, toggleSwitch, openLogDir } from './pages/settingsPage';
@@ -99,12 +99,15 @@ async function switchPage(page: PageId, navEl?: HTMLElement, scene?: MenuScene):
     const s = scene ?? currentScene;
     currentScene = s;
     await loadScene(s);
-  } else if (page === 'history') {
-    await loadHistory();
-  } else if (page === 'backup') {
-    await loadBackups();
-  } else if (page === 'settings') {
-    await initSettings();
+  } else {
+    onNavigateAway();
+    if (page === 'history') {
+      await loadHistory();
+    } else if (page === 'backup') {
+      await loadBackups();
+    } else if (page === 'settings') {
+      await initSettings();
+    }
   }
 }
 

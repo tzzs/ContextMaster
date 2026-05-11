@@ -6,12 +6,14 @@ import { isAdmin, restartAsAdmin } from '../utils/AdminHelper';
 import { wrapHandler } from '../utils/ipcWrapper';
 import log, { getLogDir } from '../utils/logger';
 import type { IWin32Shell } from '../services/Win32Shell';
+import type { SystemInfoService } from '../services/SystemInfoService';
 
 const execFileAsync = promisify(execFile);
 
 export function registerSystemHandlers(
   win32Shell?: IWin32Shell,
   getCmdStoreSize?: () => number,
+  systemInfo?: SystemInfoService,
 ): void {
   ipcMain.handle(
     IPC.SYS_IS_ADMIN,
@@ -184,6 +186,25 @@ export function registerSystemHandlers(
     IPC.WIN_IS_MAXIMIZED,
     wrapHandler(() => {
       return BrowserWindow.getFocusedWindow()?.isMaximized() ?? false;
+    })
+  );
+
+  ipcMain.handle(
+    IPC.SYS_MENU_STYLE,
+    wrapHandler(async () => {
+      if (!systemInfo) throw new Error('SystemInfoService not injected');
+      return systemInfo.getMenuStyle();
+    })
+  );
+
+  ipcMain.handle(
+    IPC.SYS_SET_MENU_STYLE,
+    wrapHandler(async (_event: unknown, target: 'classic' | 'win11-new') => {
+      if (!systemInfo) throw new Error('SystemInfoService not injected');
+      log.info(`[System] Setting menu style to: ${target}`);
+      await systemInfo.setMenuStyle(target);
+      await systemInfo.restartExplorer();
+      return true;
     })
   );
 }

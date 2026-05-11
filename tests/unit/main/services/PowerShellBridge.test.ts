@@ -35,15 +35,16 @@ describe('PowerShellBridge', () => {
 
   describe('buildGetItemsScript', () => {
     it('should return script for getting menu items', () => {
-      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+      const script = bridge.buildGetItemsScript(['DesktopBackground\\Shell']);
 
       expect(script).toContain('DesktopBackground\\Shell');
-      expect(script).toContain('Get-ChildItem');
+      // 用 .NET Registry API 直接访问（OpenSubKey），不再用 PS provider 的 Get-ChildItem
+      expect(script).toContain('OpenSubKey');
       expect(script).toContain('ConvertTo-Json');
     });
 
     it('应输出 rawMUIVerb / rawDefault / rawLocalizedDisplayName 原始字段', () => {
-      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+      const script = bridge.buildGetItemsScript(['DesktopBackground\\Shell']);
 
       expect(script).toContain('rawMUIVerb');
       expect(script).toContain('rawDefault');
@@ -51,20 +52,39 @@ describe('PowerShellBridge', () => {
     });
 
     it('不应包含 CmHelper 或 Resolve-MenuName（名称解析已移至 TS 层）', () => {
-      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+      const script = bridge.buildGetItemsScript(['DesktopBackground\\Shell']);
 
       expect(script).not.toContain('CmHelper');
       expect(script).not.toContain('Resolve-MenuName');
       expect(script).not.toContain('SHLoadIndirectString');
     });
 
-    it('应将正确的注册表路径嵌入脚本', () => {
-      const script = bridge.buildGetItemsScript('*\\shell');
-      expect(script).toContain('HKCR:\\*\\shell');
+    it('应将正确的注册表路径嵌入 $scanPaths 数组', () => {
+      const script = bridge.buildGetItemsScript(['*\\shell']);
+      expect(script).toContain("'*\\shell'");
+    });
+
+    it('多路径应全部嵌入同一脚本', () => {
+      const script = bridge.buildGetItemsScript(['*\\shell', 'AllFilesystemObjects\\shell']);
+      expect(script).toContain("'*\\shell'");
+      expect(script).toContain("'AllFilesystemObjects\\shell'");
+    });
+
+    it('应输出保护级别相关的采集字段', () => {
+      const script = bridge.buildGetItemsScript(['DesktopBackground\\Shell']);
+
+      expect(script).toContain('hasExtended');
+      expect(script).toContain('hasSubCommands');
+      expect(script).toContain('hasSuppression');
+      expect(script).toContain('hasProgrammaticAccessOnly');
+      expect(script).toContain('hasHasLUAShield');
+      expect(script).toContain('Extended');
+      expect(script).toContain('SuppressionPolicy');
+      expect(script).toContain('ProgrammaticAccessOnly');
     });
 
     it('不应包含热键清理逻辑（热键清理已移至 TS 层 cleanDisplayName）', () => {
-      const script = bridge.buildGetItemsScript('DesktopBackground\\Shell');
+      const script = bridge.buildGetItemsScript(['DesktopBackground\\Shell']);
       // -replace 只用于键名前缀剥离（$handlerKeyName -replace '^-+'），不含加速键正则
       expect(script).not.toMatch(/\(&\\w\)|\(\\w\)|&\\w/);
     });
@@ -73,7 +93,7 @@ describe('PowerShellBridge', () => {
   describe('buildGetShellExtItemsScript', () => {
     it('不应包含 CmHelper / Resolve-ExtName / Test-IsGenericName（解析已移至 TS）', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('CmHelper');
@@ -87,7 +107,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含 CommandStore 索引构建（已移至独立脚本）', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('cmdStoreVerbs');
@@ -96,7 +116,7 @@ describe('PowerShellBridge', () => {
 
     it('应输出 handlerKeyName / cleanName / defaultVal 原始字段', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('handlerKeyName');
@@ -106,7 +126,7 @@ describe('PowerShellBridge', () => {
 
     it('应输出 CLSID 子键原始字段 (clsidLocalizedString / clsidMUIVerb / clsidDefault)', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('clsidLocalizedString');
@@ -116,7 +136,7 @@ describe('PowerShellBridge', () => {
 
     it('应读取 InprocServer32 DLL 路径并输出 dllPath 字段', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('InprocServer32');
@@ -126,7 +146,7 @@ describe('PowerShellBridge', () => {
 
     it('应输出 siblingMUIVerb 字段', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('siblingMUIVerb');
@@ -134,17 +154,18 @@ describe('PowerShellBridge', () => {
 
     it('应包含 sibling shell 路径推导逻辑', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('$shellPath');
-      expect(script).toContain('$siblingVerbPath');
       expect(script).toContain('ContextMenuHandlers$');
+      // sibling shell 同名 verb 查找：OpenSubKey(shellPath + '\\' + cleanName)
+      expect(script).toMatch(/\$shellPath\s*\+\s*'\\+'\s*\+\s*\$cleanName/);
     });
 
     it('ForEach 循环应使用 $actualClsid 和 $defaultVal 分离 CLSID', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).toContain('$actualClsid');
@@ -152,7 +173,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含硬编码 friendlyNames 映射表', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('$friendlyNames');
@@ -161,7 +182,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含热键清理逻辑（已移至 TS 层）', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       // -replace 只用于键名前缀剥离，不含加速键正则
@@ -170,7 +191,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含 ReadDllStrings（已移除）', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('ReadDllStrings');
@@ -179,7 +200,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含 CmHelper.Ver 版本校验', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain("[CmHelper]::Ver");
@@ -187,7 +208,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含 Level 级别注释（Level 逻辑已移至 TS）', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('Level 0:');
@@ -198,7 +219,7 @@ describe('PowerShellBridge', () => {
 
     it('不应包含 C# 源码 Add-Type 编译', () => {
       const script = bridge.buildGetShellExtItemsScript(
-        'DesktopBackground\\shellex\\ContextMenuHandlers'
+        ['DesktopBackground\\shellex\\ContextMenuHandlers']
       );
 
       expect(script).not.toContain('using System;');

@@ -196,11 +196,4 @@ export class MenuManagerService {
   logCacheStats(): void {
     this.cache.logStats();
   }
-
-  /**
-   * 打印缓存统计日志
-   */
-  logCacheStats(): void {
-    this.registry.logCacheStats();
-  }
 }

@@ -28,6 +28,8 @@ export const IPC = {
   SYS_OPEN_EXTERNAL:    'sys:openExternal',
   SYS_LOG_TO_FILE:      'sys:logToFile',
   SYS_DIAGNOSE:         'sys:diagnose',
+  SYS_MENU_STYLE:       'sys:menuStyle',
+  SYS_SET_MENU_STYLE:   'sys:setMenuStyle',
   WIN_MINIMIZE:         'win:minimize',
   WIN_MAXIMIZE:         'win:maximize',
   WIN_CLOSE:            'win:close',

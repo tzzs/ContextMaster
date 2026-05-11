@@ -1,27 +1,25 @@
-import { MenuScene, MenuItemType } from '../../shared/enums';
+import { MenuScene, MenuItemType, ItemProtectionLevel } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { PowerShellBridge } from './PowerShellBridge';
 import { ShellExtNameResolver, CommandStoreIndex, PsRawClassicItem, PsRawShellExtItem } from './ShellExtNameResolver';
 import log from '../utils/logger';
 
-// 与 C# RegistryService._sceneRegistryPaths 完全一致
-const SCENE_REGISTRY_PATHS: Record<MenuScene, string> = {
-  [MenuScene.Desktop]:            'DesktopBackground\\Shell',
-  [MenuScene.File]:               '*\\shell',
-  [MenuScene.Folder]:             'Directory\\shell',
-  [MenuScene.Drive]:              'Drive\\shell',
-  [MenuScene.DirectoryBackground]:'Directory\\Background\\shell',
-  [MenuScene.RecycleBin]:         'CLSID\\{645FF040-5081-101B-9F08-00AA002F954E}\\shell',
+const SCENE_REGISTRY_PATHS: Record<MenuScene, string[]> = {
+  [MenuScene.Desktop]:            ['DesktopBackground\\Shell'],
+  [MenuScene.File]:               ['*\\shell', 'AllFilesystemObjects\\shell', 'SystemFileAssociations\\*\\shell'],
+  [MenuScene.Folder]:             ['Directory\\shell', 'Folder\\shell', 'AllFilesystemObjects\\shell'],
+  [MenuScene.Drive]:              ['Drive\\shell'],
+  [MenuScene.DirectoryBackground]:['Directory\\Background\\shell'],
+  [MenuScene.RecycleBin]:         ['CLSID\\{645FF040-5081-101B-9F08-00AA002F954E}\\shell'],
 };
 
-// Shell 扩展（COM）注册路径：shellex\ContextMenuHandlers
-const SCENE_SHELLEX_PATHS: Record<MenuScene, string> = {
-  [MenuScene.Desktop]:            'DesktopBackground\\shellex\\ContextMenuHandlers',
-  [MenuScene.File]:               '*\\shellex\\ContextMenuHandlers',
-  [MenuScene.Folder]:             'Directory\\shellex\\ContextMenuHandlers',
-  [MenuScene.Drive]:              'Drive\\shellex\\ContextMenuHandlers',
-  [MenuScene.DirectoryBackground]:'Directory\\Background\\shellex\\ContextMenuHandlers',
-  [MenuScene.RecycleBin]:         'CLSID\\{645FF040-5081-101B-9F08-00AA002F954E}\\shellex\\ContextMenuHandlers',
+const SCENE_SHELLEX_PATHS: Record<MenuScene, string[]> = {
+  [MenuScene.Desktop]:            ['DesktopBackground\\shellex\\ContextMenuHandlers'],
+  [MenuScene.File]:               ['*\\shellex\\ContextMenuHandlers', 'AllFilesystemObjects\\shellex\\ContextMenuHandlers'],
+  [MenuScene.Folder]:             ['Directory\\shellex\\ContextMenuHandlers', 'Folder\\shellex\\ContextMenuHandlers', 'AllFilesystemObjects\\shellex\\ContextMenuHandlers'],
+  [MenuScene.Drive]:              ['Drive\\shellex\\ContextMenuHandlers'],
+  [MenuScene.DirectoryBackground]:['Directory\\Background\\shellex\\ContextMenuHandlers'],
+  [MenuScene.RecycleBin]:         ['CLSID\\{645FF040-5081-101B-9F08-00AA002F954E}\\shellex\\ContextMenuHandlers'],
 };
 
 // 完整 HKCR 前缀（用于显示）
@@ -50,32 +48,50 @@ export class RegistryService {
    * 优先从缓存读取，缓存未命中时执行 PowerShell 查询
    */
   async getMenuItems(scene: MenuScene, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
-    const basePath = SCENE_REGISTRY_PATHS[scene];
-    const shellexPath = SCENE_SHELLEX_PATHS[scene];
+    const basePaths = SCENE_REGISTRY_PATHS[scene];
+    const shellexPaths = SCENE_SHELLEX_PATHS[scene];
 
     try {
-      // 并行读取 Classic Shell 命令 + Shell 扩展（COM ContextMenuHandlers）
-      const script = this.ps.buildGetItemsScript(basePath);
-      const shellexScript = this.ps.buildGetShellExtItemsScript(shellexPath);
-      const [raw, shellexRaw] = await Promise.all([
-        this.ps.execute<PsRawClassicItem[]>(script, priority),
-        this.ps.execute<PsRawShellExtItem[]>(shellexScript, priority).catch((e) => {
-          log.warn(`getMenuItems shellex(${scene}) failed (non-fatal):`, e);
-          return [] as PsRawShellExtItem[];
-        }),
+      // 每个场景只启动 2 个 PS 进程：一个扫描所有 classic 路径，一个扫描所有 shellex 路径
+      const [classicRaw, shellexRaw] = await Promise.all([
+        this.ps.execute<PsRawClassicItem[]>(this.ps.buildGetItemsScript(basePaths), priority)
+          .then(r => Array.isArray(r) ? r : (r ? [r] : []))
+          .catch((e) => { log.warn(`getMenuItems classic(${scene}) failed:`, e); return [] as PsRawClassicItem[]; }),
+        this.ps.execute<PsRawShellExtItem[]>(this.ps.buildGetShellExtItemsScript(shellexPaths), priority)
+          .then(r => Array.isArray(r) ? r : [])
+          .catch((e) => { log.warn(`getMenuItems shellex(${scene}) failed:`, e); return [] as PsRawShellExtItem[]; }),
       ]);
-      const classicItems = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-      const shellexItems = Array.isArray(shellexRaw) ? shellexRaw : [];
+
+      // 去重（按 subKeyName / actualClsid，保留首次出现的）
+      const seenClassic = new Set<string>();
+      const classicItems: PsRawClassicItem[] = [];
+      for (const item of classicRaw) {
+        const dedup = item.subKeyName.toLowerCase();
+        if (!seenClassic.has(dedup)) { seenClassic.add(dedup); classicItems.push(item); }
+      }
+      const seenShellExt = new Set<string>();
+      const shellexItems: PsRawShellExtItem[] = [];
+      for (const item of shellexRaw) {
+        const dedup = item.actualClsid.toLowerCase();
+        if (!seenShellExt.has(dedup)) { seenShellExt.add(dedup); shellexItems.push(item); }
+      }
 
       // Classic Shell 条目：通过 resolver 解析名称（保护：单条失败不影响整体）
       const classicEntries: MenuItemEntry[] = classicItems.map((r: PsRawClassicItem) => {
         let name: string;
+        let nameFromFallback = false;
         try {
           name = this.cleanDisplayName(this.resolver.resolveClassicName(r));
         } catch (e) {
           log.warn(`[RegistryService] resolveClassicName failed for "${r.subKeyName}":`, String(e));
           name = this.cleanDisplayName(r.subKeyName);
         }
+        // 当解析结果等于原始键名时，标记 fallback（无本地化数据可用）
+        if (name === this.cleanDisplayName(r.subKeyName)) {
+          nameFromFallback = true;
+        }
+        const protection = this.classifyProtection(r);
+        const origin = this.classifyOriginClassic(r, protection.level);
         return {
           id: this.nextId++,
           name,
@@ -87,41 +103,49 @@ export class RegistryService {
           registryKey: r.registryKey,
           type: r.command && r.command.trim() ? MenuItemType.Custom : MenuItemType.System,
           dllPath: null,
+          protectionLevel: protection.level,
+          protectionReason: protection.reason,
+          isExtended: r.hasExtended || undefined,
+          hasSubCommands: r.hasSubCommands || undefined,
+          nameFromFallback: nameFromFallback || undefined,
+          origin,
         };
       });
 
       // Shell 扩展条目：通过 resolver 解析名称（保护：单条失败不影响整体）
       const shellexEntries: MenuItemEntry[] = shellexItems.map((r: PsRawShellExtItem) => {
         let name: string;
+        let nameFromFallback = false;
         try {
           name = this.cleanDisplayName(this.resolver.resolveExtName(r, this.cmdStoreIndex));
         } catch (e) {
           log.warn(`[RegistryService] resolveExtName failed for "${r.cleanName}":`, String(e));
           name = this.cleanDisplayName(r.cleanName);
         }
+        if (name === this.cleanDisplayName(r.cleanName)) {
+          nameFromFallback = true;
+        }
+        const protection = this.classifyShellExtProtection(r.actualClsid);
+        const origin = this.classifyOriginShellExt(r, protection.level);
         return {
           id: this.nextId++,
           name,
           command: r.actualClsid,
-          iconPath: null,
+          iconPath: r.clsidIcon ?? null,
           isEnabled: r.isEnabled,
           source: r.handlerKeyName,
           menuScene: scene,
           registryKey: r.registryKey,
           type: MenuItemType.ShellExt,
           dllPath: r.dllPath ?? null,
+          protectionLevel: protection.level,
+          protectionReason: protection.reason,
+          nameFromFallback: nameFromFallback || undefined,
+          origin,
         };
       });
 
       const result = [...classicEntries, ...shellexEntries];
-
-      // 逐条诊断日志: 打印每个 ShellExt 条目的解析结果和原始数据
-      for (let i = 0; i < shellexEntries.length; i++) {
-        const entry = shellexEntries[i];
-        const raw = shellexItems[i];
-        log.info(`[ResolveTrace] ${scene} | "${entry.name}" ← cleanName="${raw.cleanName}" clsid=${raw.actualClsid} dll=${raw.dllPath || 'none'} clsidDef="${raw.clsidDefault || ''}" clsidLS="${raw.clsidLocalizedString || ''}" clsidMUI="${raw.clsidMUIVerb || ''}" progId="${raw.progIdName || ''}" dllDesc="${raw.dllFileDescription || ''}" dllProd="${raw.dllProductName || ''}" siblingMUI="${raw.siblingMUIVerb || ''}" defVal="${raw.defaultVal || ''}"`);
-      }
-
       return result;
     } catch (e) {
       log.error(`getMenuItems(${scene}) failed:`, e);
@@ -202,7 +226,7 @@ export class RegistryService {
    * 获取场景对应的完整注册表路径（用于 UI 显示）
    */
   getFullRegistryPath(scene: MenuScene): string {
-    return `${HKCR_PREFIX}\\${SCENE_REGISTRY_PATHS[scene]}`;
+    return `${HKCR_PREFIX}\\${SCENE_REGISTRY_PATHS[scene][0]}`;
   }
 
   private async setItemEnabledInternal(registryKey: string, enabled: boolean): Promise<void> {
@@ -231,4 +255,77 @@ export class RegistryService {
       .trim();
   }
 
+  classifyProtection(
+    raw: PsRawClassicItem,
+  ): { level: ItemProtectionLevel; reason?: string } {
+    if (raw.hasSuppression) {
+      return { level: ItemProtectionLevel.Protected, reason: '系统策略禁止修改' };
+    }
+    if (raw.hasProgrammaticAccessOnly) {
+      return { level: ItemProtectionLevel.Protected, reason: '编程专用条目' };
+    }
+    const verb = raw.subKeyName.toLowerCase();
+    const coreVerbs = ['open', 'explore', 'find', 'properties'];
+    if (coreVerbs.includes(verb) && !raw.command?.trim()) {
+      return { level: ItemProtectionLevel.Protected, reason: '系统核心功能' };
+    }
+    if (raw.hasExtended) {
+      return { level: ItemProtectionLevel.Warning, reason: '仅 Shift+右键可见' };
+    }
+    const warningVerbs = ['runas', 'runasuser'];
+    if (warningVerbs.includes(verb)) {
+      return { level: ItemProtectionLevel.Warning, reason: '系统管理功能' };
+    }
+    return { level: ItemProtectionLevel.Normal };
+  }
+
+  classifyShellExtProtection(clsid: string): { level: ItemProtectionLevel; reason?: string } {
+    if (SYSTEM_SHELL_EXT_CLSIDS.has(clsid.toLowerCase())) {
+      return { level: ItemProtectionLevel.Warning, reason: '系统内置扩展' };
+    }
+    return { level: ItemProtectionLevel.Normal };
+  }
+
+  /** Classic Shell 条目来源判定（系统 vs 第三方） */
+  classifyOriginClassic(
+    raw: PsRawClassicItem,
+    protectionLevel: ItemProtectionLevel,
+  ): 'system' | 'third-party' {
+    if (protectionLevel === ItemProtectionLevel.Protected) return 'system';
+    const verb = raw.subKeyName.toLowerCase();
+    const systemVerbs = ['open', 'explore', 'find', 'properties', 'runas', 'runasuser', 'edit', 'print', 'printto', 'preview', 'play'];
+    if (systemVerbs.includes(verb)) return 'system';
+    return 'third-party';
+  }
+
+  /** Shell 扩展条目来源判定（系统 vs 第三方）—— CLSID 白名单或 DLL 位于 Windows 系统目录视为 system */
+  classifyOriginShellExt(
+    raw: PsRawShellExtItem,
+    _protectionLevel: ItemProtectionLevel,
+  ): 'system' | 'third-party' {
+    if (SYSTEM_SHELL_EXT_CLSIDS.has(raw.actualClsid.toLowerCase())) return 'system';
+    if (raw.dllPath) {
+      const lc = raw.dllPath.toLowerCase().replace(/\//g, '\\');
+      if (lc.includes('\\windows\\system32\\') ||
+          lc.includes('\\windows\\syswow64\\') ||
+          lc.includes('\\windows\\winsxs\\') ||
+          lc.includes('\\windows\\immersivecontrolpanel\\') ||
+          lc.match(/^[a-z]:\\windows\\[^\\]+\.dll$/i)) {
+        return 'system';
+      }
+    }
+    return 'third-party';
+  }
 }
+
+const SYSTEM_SHELL_EXT_CLSIDS = new Set([
+  '{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}', // Shell DocObject Viewer
+  '{90aa3a4e-1cba-4233-b8bb-535773d48449}', // 共享
+  '{ffe2a43c-56b9-4bf5-9a79-cc6d4285608a}', // CopyAsPath
+  '{7ad84985-87b4-4a16-be58-8b72a5b390f7}', // CopyAsPathMenu
+  '{49707377-a065-4a55-a672-40d0c9a30529}', // PlayTo Menu
+  '{e2bf9676-5f8f-435c-97eb-11607a5bedf7}', // 新建
+  '{d969a300-e7ff-11d0-a93b-00a0c90f2719}', // 任务栏固定
+  '{b63ea76d-1f85-456f-a19c-48159efa858b}', // 快速访问固定
+  '{081e31a0-8c7a-48cc-93b1-ed49cc3a8ac7}', // 开始菜单固定
+]);

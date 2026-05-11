@@ -196,8 +196,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const defaultNav = document.querySelector<HTMLElement>('.nav-item[data-scene="Desktop"]');
   await switchPage('main', defaultNav ?? undefined, MenuScene.Desktop);
 
-  // 后台预加载其余场景的 badge 数量（不阻塞 UI）
-  preloadBadgeCounts(MenuScene.Desktop);
+  // 注：不再启动时预加载其他场景的 badge。它们会在用户切到对应场景时延迟加载
+  // 避免 5 个并发 PS 进程争抢首屏 PS 槽，导致用户切场景时排队等待
+  void preloadBadgeCounts; // 显式忽略，保留导入避免 lint 警告
 
   // 窗口最大化状态同步
   window.addEventListener('resize', updateMaximizeBtn);

@@ -1,8 +1,30 @@
 import '../api/bridge';
-import { MenuScene, MenuItemType } from '../../shared/enums';
-import type { MenuItemEntry, ToggleItemParams } from '../../shared/types';
+import { MenuScene, MenuItemType, ItemProtectionLevel } from '../../shared/enums';
+import type { MenuItemEntry, ToggleItemParams, SystemMenuStyle } from '../../shared/types';
 import { t, registerRefreshCallback } from '../i18n';
 import { escapeHtml } from '../utils/html';
+import { getSettingsStore } from '../utils/settingsStore';
+
+// ── 分组类型 ──
+type GroupKey = 'app' | 'system' | 'dangerous';
+
+function categorizeItem(item: MenuItemEntry): GroupKey {
+  if (item.protectionLevel === ItemProtectionLevel.Protected) return 'dangerous';
+  if (item.origin === 'system' || item.protectionLevel === ItemProtectionLevel.Warning) return 'system';
+  return 'app';
+}
+
+// 折叠状态：内存保存，不持久化；默认应用展开，系统/高危折叠
+const groupCollapseState: Map<MenuScene, Set<GroupKey>> = new Map();
+
+function getCollapsedSet(scene: MenuScene): Set<GroupKey> {
+  let set = groupCollapseState.get(scene);
+  if (!set) {
+    set = new Set<GroupKey>(['system', 'dangerous']);
+    groupCollapseState.set(scene, set);
+  }
+  return set;
+}
 
 interface MainWindow extends Window {
   showUndo?: (msg: string, itemId: number) => void;
@@ -91,12 +113,45 @@ export async function loadScene(scene: MenuScene, forceRefresh = false): Promise
   }
 
   const listEl = document.getElementById('itemList');
-  if (listEl) listEl.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><span>${t('main.loading')}</span></div>`;
+  const loadStart = Date.now();
+  // 仅在首次加载（无旧内容可显示）时清空列表显示 loading；
+  // 切场景时保留旧场景列表可见，只在标题上标记加载状态，避免用户看到的列表"消失"
+  const hasOldContent = currentItems.length > 0 && listEl && !listEl.querySelector('.loading-state');
+  if (listEl && !hasOldContent) {
+    listEl.innerHTML = `<div class="loading-state">
+      <div class="loading-spinner"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span>${t('main.loading')}</span>
+        <span id="loadingElapsed" style="font-size:11px;color:var(--text3);">正在扫描注册表…</span>
+      </div>
+    </div>`;
+  }
+  // 始终在标题上显示 loading 提示
+  const titleEl = document.getElementById('sceneTitle');
+  if (titleEl) titleEl.innerHTML = `${getSceneName(scene)} <span class="loading-badge">加载中…</span>`;
 
-  selectedItemId = null;
-  resetDetailPanel();
+  // 进度文本：每秒更新 elapsed 提示
+  const elapsedTimer = setInterval(() => {
+    const el = document.getElementById('loadingElapsed');
+    const elapsed = Math.floor((Date.now() - loadStart) / 1000);
+    if (titleEl) {
+      titleEl.innerHTML = `${getSceneName(scene)} <span class="loading-badge">加载中 ${elapsed}s…</span>`;
+    }
+    if (!el) return;
+    if (elapsed >= 8) {
+      el.textContent = `正在扫描注册表… 已耗时 ${elapsed}s（首次加载较慢，请稍候）`;
+    } else if (elapsed >= 3) {
+      el.textContent = `正在扫描注册表… 已耗时 ${elapsed}s`;
+    }
+  }, 1000);
+
+  if (!hasOldContent) {
+    selectedItemId = null;
+    resetDetailPanel();
+  }
 
   const result = await window.api.getMenuItems(scene);
+  clearInterval(elapsedTimer);
   loadingScene = false;
 
   if (!result.success) {
@@ -124,7 +179,7 @@ async function silentRefreshScene(scene: MenuScene): Promise<void> {
   }
 }
 
-// ── 渲染条目列表 ──
+// ── 渲染条目列表（按 origin/protection 三段分组）──
 export function renderItems(): void {
   const listEl = document.getElementById('itemList');
   if (!listEl) return;
@@ -142,7 +197,17 @@ export function renderItems(): void {
     );
   }
 
-  if (!items.length) {
+  // 按 origin/protection 分组
+  const showDangerous = getSettingsStore().getSettings().showDangerousItems;
+  const groups: Record<GroupKey, MenuItemEntry[]> = { app: [], system: [], dangerous: [] };
+  for (const item of items) {
+    groups[categorizeItem(item)].push(item);
+  }
+  const dangerousHiddenCount = !showDangerous ? groups.dangerous.length : 0;
+  if (!showDangerous) groups.dangerous = [];
+
+  const totalVisible = groups.app.length + groups.system.length + groups.dangerous.length;
+  if (!totalVisible && !dangerousHiddenCount) {
     listEl.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/></svg>
       <div>${t('main.noItems')}</div>
@@ -150,11 +215,55 @@ export function renderItems(): void {
     return;
   }
 
-  listEl.innerHTML = items.map((item) => renderItemCard(item)).join('');
+  const collapsed = getCollapsedSet(currentScene);
+  const sections: string[] = [];
+  const renderSection = (key: GroupKey, title: string, accent: 'app' | 'system' | 'danger') => {
+    const list = groups[key];
+    if (!list.length) return;
+    const isCollapsed = collapsed.has(key);
+    const arrow = isCollapsed ? '▸' : '▾';
+    const accentClass = accent === 'danger' ? 'group-header-danger' : accent === 'system' ? 'group-header-system' : '';
+    sections.push(`<div class="group-header ${accentClass}" data-group="${key}" onclick="window._mainPage.toggleGroup('${key}')">
+      <span class="group-arrow">${arrow}</span>
+      <span class="group-title">${escapeHtml(title)}</span>
+      <span class="group-count">${list.length}</span>
+    </div>`);
+    if (!isCollapsed) {
+      sections.push(...list.map((item) => renderItemCard(item)));
+    }
+  };
+
+  renderSection('app', t('main.groupApp') ?? '应用菜单', 'app');
+  renderSection('system', t('main.groupSystem') ?? '系统菜单', 'system');
+  renderSection('dangerous', `${t('main.groupDangerous') ?? '高危系统条目'} ⚠`, 'danger');
+
+  if (dangerousHiddenCount > 0) {
+    sections.push(`<div class="dangerous-hidden-hint" onclick="window._mainPage.openSecuritySettings()">
+      <svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:var(--text3);flex-shrink:0;"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+      <span>${dangerousHiddenCount} 条高危系统条目已隐藏 · 在设置中开启「显示高危条目」可查看</span>
+    </div>`);
+  }
+
+  listEl.innerHTML = sections.join('');
+}
+
+// 折叠/展开分组
+export function toggleGroup(key: GroupKey): void {
+  const collapsed = getCollapsedSet(currentScene);
+  if (collapsed.has(key)) collapsed.delete(key);
+  else collapsed.add(key);
+  renderItems();
+}
+
+// 跳转到设置页"安全"section
+export function openSecuritySettings(): void {
+  const navSettings = document.querySelector<HTMLElement>('.nav-item[data-page="settings"]');
+  if (navSettings) navSettings.click();
 }
 
 function renderItemCard(item: MenuItemEntry, showScene = false): string {
   const isSelected = item.id === selectedItemId;
+  const isProtected = item.protectionLevel === ItemProtectionLevel.Protected;
   const typeTag =
     item.type === MenuItemType.Custom
       ? `<span class="tag tag-custom">${t('item.custom')}</span>`
@@ -164,26 +273,39 @@ function renderItemCard(item: MenuItemEntry, showScene = false): string {
   const stateTag = item.isEnabled
     ? `<span class="tag tag-enabled">${t('item.enabled')}</span>`
     : `<span class="tag tag-disabled">${t('item.disabled')}</span>`;
+  const extendedTag = item.isExtended ? '<span class="tag tag-extended">Shift</span>' : '';
+  const subCmdTag = item.hasSubCommands ? '<span class="tag tag-subcmd">▸</span>' : '';
   const sourceText = showScene
     ? `${getSceneName(item.menuScene)}${item.source ? ' · ' + item.source : ''}`
     : (item.source || t('item.sourceUnknown'));
 
+  const toggleDisabled = isProtected ? ' disabled' : '';
+  const toggleTitle = isProtected && item.protectionReason
+    ? ` title="${escapeHtml(item.protectionReason)}"`
+    : '';
+
+  const fallbackTag = item.nameFromFallback
+    ? '<span class="fallback-name-tag" title="无本地化数据，显示为原始键名">（原始键名）</span>'
+    : '';
+
   return `
-  <div class="item-card${item.isEnabled ? '' : ' disabled-row'}${isSelected ? ' selected' : ''}"
+  <div class="item-card${item.isEnabled ? '' : ' disabled-row'}${isSelected ? ' selected' : ''}${isProtected ? ' protected-row' : ''}"
        onclick="window._mainPage.selectItem(${item.id})">
     <div class="checkbox" onclick="event.stopPropagation()">
       <svg viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg>
     </div>
     <div class="item-icon">📄</div>
     <div class="item-info">
-      <div class="item-name">${escapeHtml(item.name)}</div>
+      <div class="item-name">${escapeHtml(item.name)}${fallbackTag}</div>
       <div class="item-cmd">${escapeHtml(item.command || '—')}</div>
       <div class="item-source">${escapeHtml(sourceText)}</div>
     </div>
     <div class="item-meta">
       ${typeTag}
+      ${extendedTag}
+      ${subCmdTag}
       ${stateTag}
-      <button class="toggle-switch ${item.isEnabled ? 'on' : 'off'}"
+      <button class="toggle-switch ${item.isEnabled ? 'on' : 'off'}"${toggleDisabled}${toggleTitle}
         onclick="event.stopPropagation();window._mainPage.toggleItem(${item.id})">
         <div class="toggle-thumb"></div>
       </button>
@@ -210,6 +332,15 @@ export function selectItem(id: number): void {
 export async function toggleItem(id: number): Promise<void> {
   const item = currentItems.find((i) => i.id === id);
   if (!item) return;
+
+  if (item.protectionLevel === ItemProtectionLevel.Protected) {
+    showOperationError(item.protectionReason || '该条目受系统保护，无法修改');
+    return;
+  }
+  if (item.protectionLevel === ItemProtectionLevel.Warning) {
+    const action = item.isEnabled ? '禁用' : '启用';
+    if (!confirm(`${item.name} 是${item.protectionReason || '系统功能'}，确定要${action}吗？`)) return;
+  }
 
   const params: ToggleItemParams = {
     registryKey: item.registryKey,
@@ -294,8 +425,27 @@ export function showDetail(id: number): void {
       <div class="detail-field-label">${t('item.type')}</div>
       <div class="detail-field-value">
         <span class="tag ${item.type === MenuItemType.Custom ? 'tag-custom' : item.type === MenuItemType.ShellExt ? 'tag-shellext' : 'tag-system'}">${item.type === MenuItemType.Custom ? t('item.custom') : item.type === MenuItemType.ShellExt ? t('item.shellExt') : t('item.system')}</span>
+        ${item.isExtended ? '<span class="tag tag-extended" style="margin-left:4px;">Shift+右键</span>' : ''}
+        ${item.hasSubCommands ? '<span class="tag tag-subcmd" style="margin-left:4px;">含子菜单</span>' : ''}
       </div>
     </div>
+    ${item.origin ? `<div class="detail-field">
+      <div class="detail-field-label">来源分类</div>
+      <div class="detail-field-value">
+        <span class="tag ${item.origin === 'system' ? 'tag-shellext' : 'tag-custom'}">${item.origin === 'system' ? '系统内置' : '第三方应用'}</span>
+      </div>
+    </div>` : ''}
+    ${item.protectionLevel !== ItemProtectionLevel.Normal ? `<div class="detail-field">
+      <div class="detail-field-label">保护级别</div>
+      <div class="detail-field-value">
+        <span class="tag ${item.protectionLevel === ItemProtectionLevel.Protected ? 'tag-disabled' : 'tag-extended'}">${item.protectionLevel === ItemProtectionLevel.Protected ? '受保护' : '需确认'}</span>
+        ${item.protectionReason ? `<span style="font-size:11px;color:var(--text3);margin-left:6px;">${escapeHtml(item.protectionReason)}</span>` : ''}
+      </div>
+    </div>
+    ${item.protectionLevel === ItemProtectionLevel.Protected ? `<div style="display:flex;align-items:flex-start;gap:6px;background:var(--danger-bg);border:1px solid rgba(196,43,28,0.18);border-radius:var(--radius-sm);padding:7px 9px;margin-top:4px;">
+      <svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:var(--danger);flex-shrink:0;margin-top:1px;"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+      <span style="font-size:11px;color:var(--danger);line-height:1.5;">⚠ 此条目影响资源管理器核心功能，禁用可能导致桌面/资源管理器异常</span>
+    </div>` : ''}` : ''}
     <div class="detail-field">
       <div class="detail-field-label">${t('item.source')}</div>
       <div class="detail-field-value">${escapeHtml(item.source || '—')}</div>
@@ -345,7 +495,17 @@ export function showDetail(id: number): void {
       </button>
     </div>
   `;
-  if (actionsEl) actionsEl.style.display = 'flex';
+  if (actionsEl) {
+    const isProtected = item.protectionLevel === ItemProtectionLevel.Protected;
+    actionsEl.style.display = 'flex';
+    const toggleBtn = actionsEl.querySelector('.btn-primary') as HTMLButtonElement | null;
+    if (toggleBtn) {
+      toggleBtn.disabled = isProtected;
+      toggleBtn.title = isProtected ? (item.protectionReason || '受保护条目') : '';
+      toggleBtn.style.opacity = isProtected ? '0.4' : '';
+      toggleBtn.style.cursor = isProtected ? 'not-allowed' : '';
+    }
+  }
 }
 
 export function flashCopyBtn(btn: HTMLButtonElement): void {
@@ -363,10 +523,29 @@ export function setFilter(mode: 'all' | 'enabled' | 'disabled', btn: HTMLElement
 }
 
 // ── 状态栏 ──
+let cachedMenuStyle: SystemMenuStyle | null = null;
+
 function updateStatusBar(scene: MenuScene): void {
   const sbScene = document.getElementById('sbScene');
   if (sbScene) sbScene.textContent = `${t('statusBar.currentScene')}${getSceneName(scene)}`;
   updateStatusBarFromCurrent();
+  if (!cachedMenuStyle) {
+    void loadMenuStyleLabel();
+  }
+}
+
+async function loadMenuStyleLabel(): Promise<void> {
+  const result = await window.api.getMenuStyle();
+  if (!result.success) return;
+  cachedMenuStyle = result.data;
+  const el = document.getElementById('sbMenuStyle');
+  if (!el) return;
+  const label = cachedMenuStyle.menuStyle === 'win11-new'
+    ? 'Win11 新版菜单'
+    : cachedMenuStyle.osVersion === 'win11'
+      ? 'Win11 经典菜单'
+      : 'Win10 经典菜单';
+  el.textContent = label;
 }
 
 function updateStatusBarFromCurrent(): void {
@@ -478,15 +657,24 @@ export function restoreSceneTitle(scene: MenuScene): void {
   resetDetailPanel();
 }
 
-// ── 预加载其余场景的 badge 数量（串行，每个场景完成后立即更新，渐进显示）──
+// ── 预加载其余场景的 badge 数量（延迟 + 并发，依赖 PS 信号量自然限流）──
+// 延迟 1.2s 启动让首屏 Desktop 渲染完毕，避免争抢 PS 槽位；
+// 并发发起所有场景请求，每个完成后立即更新对应 badge
+let preloadBadgeCancelled = false;
 export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
+  preloadBadgeCancelled = false;
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  if (preloadBadgeCancelled) return;
+
   const allScenes = Object.values(MenuScene) as MenuScene[];
   const targetScenes = allScenes.filter((scene) => scene !== skipScene);
 
-  for (const scene of targetScenes) {
+  await Promise.all(targetScenes.map(async (scene) => {
+    if (preloadBadgeCancelled) return;
     const result = await window.api.getMenuItems(scene).catch(() => null);
+    if (preloadBadgeCancelled) return;
     const badgeEl = document.getElementById(`badge-${scene}`);
-    if (!badgeEl) continue;
+    if (!badgeEl) return;
 
     if (result && result.success && 'data' in result) {
       badgeEl.textContent = String(result.data.length);
@@ -494,7 +682,11 @@ export async function preloadBadgeCounts(skipScene: MenuScene): Promise<void> {
     } else {
       badgeEl.textContent = '?';
     }
-  }
+  }));
+}
+
+export function cancelBadgePreload(): void {
+  preloadBadgeCancelled = true;
 }
 
 export function onNavigateAway(): void {
@@ -516,6 +708,12 @@ export function onNavigateAway(): void {
 })();
 
 // 挂载到 window 供 HTML inline onclick 调用
-const mainPageApi = { selectItem, toggleItem, setFilter, flashCopyBtn, toggleFromDetail, deleteSelected };
+const mainPageApi = { selectItem, toggleItem, setFilter, flashCopyBtn, toggleFromDetail, deleteSelected, toggleGroup, openSecuritySettings };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (window as any)._mainPage = mainPageApi;
+
+// 监听"显示高危条目"开关变化，立即刷新当前列表
+window.addEventListener('cm:show-dangerous-changed', () => {
+  renderItems();
+  updateStatusBarFromCurrent();
+});

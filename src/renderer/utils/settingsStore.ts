@@ -3,6 +3,8 @@ import type { SupportedLanguage } from '../i18n';
 export interface AppSettings {
   theme: 'system' | 'light' | 'dark';
   language: SupportedLanguage;
+  /** 是否显示高危系统条目（默认关闭，避免用户误禁导致资源管理器异常） */
+  showDangerousItems: boolean;
 }
 
 const SETTINGS_KEY = 'contextmaster_settings';
@@ -10,6 +12,7 @@ const SETTINGS_KEY = 'contextmaster_settings';
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   language: 'zh-CN',
+  showDangerousItems: false,
 };
 
 class SettingsStore {

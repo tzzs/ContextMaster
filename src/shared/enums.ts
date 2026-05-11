@@ -27,3 +27,9 @@ export enum BackupType {
   Auto = 'Auto',
   Manual = 'Manual',
 }
+
+export enum ItemProtectionLevel {
+  Normal = 'normal',
+  Warning = 'warning',
+  Protected = 'protected',
+}

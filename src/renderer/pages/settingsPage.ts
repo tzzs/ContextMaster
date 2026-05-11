@@ -9,6 +9,67 @@ let isSettingsInitialized = false;
 export async function initSettings(): Promise<void> {
   await updateAdminStatus();
   initAppearanceSettings();
+  initSecuritySettings();
+  void initMenuStyleSettings();
+}
+
+async function initMenuStyleSettings(): Promise<void> {
+  const currentEl = document.getElementById('menuStyleCurrent');
+  const btnClassic = document.getElementById('btnSetClassic') as HTMLButtonElement | null;
+  const btnWin11 = document.getElementById('btnSetWin11') as HTMLButtonElement | null;
+  const result = await window.api.getMenuStyle();
+  if (!result.success) {
+    if (currentEl) currentEl.textContent = '检测失败';
+    return;
+  }
+  const { menuStyle, osVersion, buildNumber } = result.data;
+  const label = menuStyle === 'win11-new'
+    ? 'Win11 新版菜单（精简）'
+    : osVersion === 'win11' ? 'Win10 经典菜单（已切回经典样式）' : 'Win10 经典菜单';
+  if (currentEl) currentEl.textContent = `${label} · build ${buildNumber}`;
+
+  // 非 Win11 系统：禁用切换按钮
+  if (osVersion !== 'win11') {
+    if (btnClassic) { btnClassic.disabled = true; btnClassic.style.opacity = '0.4'; btnClassic.style.cursor = 'not-allowed'; }
+    if (btnWin11) { btnWin11.disabled = true; btnWin11.style.opacity = '0.4'; btnWin11.style.cursor = 'not-allowed'; }
+    return;
+  }
+  // 当前样式按钮置灰
+  if (menuStyle === 'classic' && btnClassic) { btnClassic.disabled = true; btnClassic.style.opacity = '0.4'; }
+  if (menuStyle === 'win11-new' && btnWin11) { btnWin11.disabled = true; btnWin11.style.opacity = '0.4'; }
+}
+
+export async function switchMenuStyle(target: 'classic' | 'win11-new'): Promise<void> {
+  const label = target === 'classic' ? 'Win10 经典菜单' : 'Win11 新版菜单';
+  if (!confirm(`确定要切换到「${label}」？\n\n这将重启资源管理器进程（explorer.exe），所有打开的文件资源管理器窗口会被关闭。\n\n桌面/任务栏会短暂消失后自动恢复。`)) return;
+  const result = await window.api.setMenuStyle(target);
+  if (!result.success) {
+    alert(`切换失败: ${result.error}`);
+    return;
+  }
+  alert(`已切换到「${label}」。如果资源管理器没有自动恢复，请手动按 Win+E 启动。`);
+  // 重新初始化样式显示
+  await initMenuStyleSettings();
+}
+
+function initSecuritySettings(): void {
+  const store = getSettingsStore();
+  const showDangerous = store.getSettings().showDangerousItems;
+  const toggle = document.getElementById('showDangerousToggle');
+  if (toggle) {
+    toggle.classList.toggle('on', showDangerous);
+    toggle.classList.toggle('off', !showDangerous);
+  }
+}
+
+export function toggleShowDangerous(btn: HTMLElement): void {
+  const store = getSettingsStore();
+  const newState = !store.getSettings().showDangerousItems;
+  btn.classList.toggle('on', newState);
+  btn.classList.toggle('off', !newState);
+  store.setSetting('showDangerousItems', newState);
+  // 通知 mainPage 立即刷新当前列表
+  window.dispatchEvent(new CustomEvent('cm:show-dangerous-changed', { detail: newState }));
 }
 
 async function updateAdminStatus(): Promise<void> {
@@ -95,6 +156,8 @@ export async function runDiagnose(): Promise<void> {
 const settingsPageApi = {
   requestAdminRestart,
   toggleSwitch,
+  toggleShowDangerous,
+  switchMenuStyle,
   openLogDir,
   runDiagnose,
 };

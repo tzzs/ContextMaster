@@ -8,6 +8,7 @@ import type {
   RestoreDiffItem,
   ToggleItemParams,
   BatchToggleParams,
+  SystemMenuStyle,
 } from '../shared/types';
 import type { MenuScene } from '../shared/enums';
 
@@ -77,6 +78,12 @@ const api = {
 
   diagnose: () =>
     invoke<Record<string, unknown>>(IPC.SYS_DIAGNOSE),
+
+  getMenuStyle: () =>
+    invoke<SystemMenuStyle>(IPC.SYS_MENU_STYLE),
+
+  setMenuStyle: (target: 'classic' | 'win11-new') =>
+    invoke<boolean>(IPC.SYS_SET_MENU_STYLE, target),
 
   openExternal: (url: string) =>
     invoke<void>(IPC.SYS_OPEN_EXTERNAL, url),

@@ -2,17 +2,11 @@ import { MenuScene, OperationType } from '../../shared/enums';
 import { MenuItemEntry } from '../../shared/types';
 import { RegistryService } from './RegistryService';
 import { OperationHistoryService } from './OperationHistoryService';
+import { RegistryCache } from '../utils/RegistryCache';
 import log from '../utils/logger';
 
-interface CacheEntry {
-  items: MenuItemEntry[];
-  timestamp: number;
-}
-
-const CACHE_TTL = 5 * 60 * 1000;
-
 export class MenuManagerService {
-  private cache = new Map<MenuScene, CacheEntry>();
+  private cache = new RegistryCache(2 * 60 * 1000);
   private inFlight = new Map<MenuScene, Promise<MenuItemEntry[]>>();
 
   constructor(
@@ -23,9 +17,9 @@ export class MenuManagerService {
   async getMenuItems(scene: MenuScene, forceRefresh = false, priority: 'high' | 'normal' = 'normal'): Promise<MenuItemEntry[]> {
     if (!forceRefresh) {
       const cached = this.cache.get(scene);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      if (cached) {
         log.debug(`[MenuManager] Cache hit for scene: ${scene}`);
-        return cached.items;
+        return cached;
       }
       const existing = this.inFlight.get(scene);
       if (existing) {
@@ -42,7 +36,7 @@ export class MenuManagerService {
         if (elapsed > 100) {
           log.info(`[MenuManager] Loaded ${items.length} items for ${scene} in ${elapsed}ms`);
         }
-        this.cache.set(scene, { items, timestamp: Date.now() });
+        this.cache.set(scene, items);
         this.inFlight.delete(scene);
         return items;
       })
@@ -57,11 +51,9 @@ export class MenuManagerService {
 
   invalidateCache(scene?: MenuScene): void {
     if (scene) {
-      this.cache.delete(scene);
-      log.debug(`[MenuManager] Cache invalidated for scene: ${scene}`);
+      this.cache.invalidate(scene);
     } else {
-      this.cache.clear();
-      log.debug('[MenuManager] All cache invalidated');
+      this.cache.invalidateAll();
     }
   }
 
@@ -104,9 +96,7 @@ export class MenuManagerService {
     if (result.newRegistryKey) item.registryKey = result.newRegistryKey;
     item.isEnabled = true;
     
-    // 操作成功后清除对应场景的缓存
-    this.registry.invalidateCache(item.menuScene);
-    log.debug(`Cache invalidated for scene ${item.menuScene} after enabling ${item.name}`);
+    this.cache.invalidate(item.menuScene);
     
     this.history.recordOperation(
       OperationType.Enable,
@@ -125,9 +115,7 @@ export class MenuManagerService {
     if (result.newRegistryKey) item.registryKey = result.newRegistryKey;
     item.isEnabled = false;
     
-    // 操作成功后清除对应场景的缓存
-    this.registry.invalidateCache(item.menuScene);
-    log.debug(`Cache invalidated for scene ${item.menuScene} after disabling ${item.name}`);
+    this.cache.invalidate(item.menuScene);
     
     this.history.recordOperation(
       OperationType.Disable,
@@ -152,17 +140,13 @@ export class MenuManagerService {
     const targets = items.filter((i) => !i.isEnabled);
     if (!targets.length) return;
 
-    // 收集需要清除缓存的场景
-    const affectedScenes = new Set<MenuScene>();
-    
     this.registry.createRollbackPoint(targets);
     try {
       for (const item of targets) {
         await this.enableItem(item);
-        affectedScenes.add(item.menuScene);
       }
       this.registry.commitTransaction();
-      this.cache.clear();
+      this.cache.invalidateAll();
     } catch (e) {
       await this.registry.rollback();
       throw new Error(`批量启用失败，已回滚: ${(e as Error).message}`);
@@ -173,17 +157,13 @@ export class MenuManagerService {
     const targets = items.filter((i) => i.isEnabled);
     if (!targets.length) return;
 
-    // 收集需要清除缓存的场景
-    const affectedScenes = new Set<MenuScene>();
-    
     this.registry.createRollbackPoint(targets);
     try {
       for (const item of targets) {
         await this.disableItem(item);
-        affectedScenes.add(item.menuScene);
       }
       this.registry.commitTransaction();
-      this.cache.clear();
+      this.cache.invalidateAll();
     } catch (e) {
       await this.registry.rollback();
       throw new Error(`批量禁用失败，已回滚: ${(e as Error).message}`);
@@ -209,14 +189,11 @@ export class MenuManagerService {
   /**
    * 获取缓存统计信息
    */
-  getCacheStats(): ReturnType<RegistryService['getCacheStats']> {
-    return this.registry.getCacheStats();
+  getCacheStats() {
+    return this.cache.getStats();
   }
 
-  /**
-   * 打印缓存统计日志
-   */
   logCacheStats(): void {
-    this.registry.logCacheStats();
+    this.cache.logStats();
   }
 }

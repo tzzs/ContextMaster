@@ -3,7 +3,7 @@ import { RegistryService } from '@/main/services/RegistryService';
 import { PowerShellBridge } from '@/main/services/PowerShellBridge';
 import { ShellExtNameResolver, CommandStoreIndex } from '@/main/services/ShellExtNameResolver';
 import { IWin32Shell } from '@/main/services/Win32Shell';
-import { MenuScene, MenuItemType } from '@shared/enums';
+import { MenuScene, MenuItemType, ItemProtectionLevel } from '@shared/enums';
 
 // Mock PowerShellBridge
 vi.mock('@/main/services/PowerShellBridge');
@@ -63,9 +63,17 @@ describe('RegistryService', () => {
         isEnabled: true,
         command: 'test.exe',
         registryKey: 'HKCR\\Test\\shell\\Test Menu',
+        hasExtended: false,
+        hasSubCommands: false,
+        hasSuppression: false,
+        hasProgrammaticAccessOnly: false,
+        hasHasLUAShield: false,
       }];
 
-      mockPs.execute.mockResolvedValueOnce(rawItems).mockResolvedValueOnce([]);
+      // File 场景现在只有 2 次 execute 调用（多路径合并为单脚本）
+      mockPs.execute
+        .mockResolvedValueOnce(rawItems) // 所有 classic 路径（*\shell 等）合并
+        .mockResolvedValueOnce([]);      // 所有 shellex 路径合并
 
       const result = await service.getMenuItems(MenuScene.File);
 
@@ -85,11 +93,13 @@ describe('RegistryService', () => {
         clsidLocalizedString: null,
         clsidMUIVerb: null,
         clsidDefault: null,
+        clsidIcon: null,
         dllPath: 'C:\\Program Files\\YunShellExt\\YunShellExt64.dll',
         siblingMUIVerb: null,
         registryKey: 'DesktopBackground\\shellex\\ContextMenuHandlers\\YunShellExt',
       }];
 
+      // Desktop 场景有 1 个 classic + 1 个 shellex → 2 次
       mockPs.execute.mockResolvedValueOnce([]).mockResolvedValueOnce(shellextItems);
 
       const result = await service.getMenuItems(MenuScene.Desktop);
@@ -221,6 +231,79 @@ describe('RegistryService', () => {
       const result = await service.getMenuItems(MenuScene.Desktop);
 
       expect(result[0].dllPath).toBeNull();
+    });
+  });
+
+  describe('classifyProtection', () => {
+    function makeRaw(overrides: Record<string, unknown> = {}) {
+      return {
+        subKeyName: 'test',
+        rawMUIVerb: null,
+        rawDefault: null,
+        rawLocalizedDisplayName: null,
+        rawIcon: null,
+        isEnabled: true,
+        command: '',
+        registryKey: 'test',
+        hasExtended: false,
+        hasSubCommands: false,
+        hasSuppression: false,
+        hasProgrammaticAccessOnly: false,
+        hasHasLUAShield: false,
+        ...overrides,
+      };
+    }
+
+    it('SuppressionPolicy → Protected', () => {
+      const result = service.classifyProtection(makeRaw({ hasSuppression: true }));
+      expect(result.level).toBe(ItemProtectionLevel.Protected);
+    });
+
+    it('ProgrammaticAccessOnly → Protected', () => {
+      const result = service.classifyProtection(makeRaw({ hasProgrammaticAccessOnly: true }));
+      expect(result.level).toBe(ItemProtectionLevel.Protected);
+    });
+
+    it('open verb without command → Protected', () => {
+      const result = service.classifyProtection(makeRaw({ subKeyName: 'open', command: '' }));
+      expect(result.level).toBe(ItemProtectionLevel.Protected);
+    });
+
+    it('open verb with command → Normal (has custom command)', () => {
+      const result = service.classifyProtection(makeRaw({ subKeyName: 'open', command: 'notepad.exe' }));
+      expect(result.level).toBe(ItemProtectionLevel.Normal);
+    });
+
+    it('Extended verb → Warning', () => {
+      const result = service.classifyProtection(makeRaw({ hasExtended: true }));
+      expect(result.level).toBe(ItemProtectionLevel.Warning);
+    });
+
+    it('runas verb → Warning', () => {
+      const result = service.classifyProtection(makeRaw({ subKeyName: 'runas' }));
+      expect(result.level).toBe(ItemProtectionLevel.Warning);
+    });
+
+    it('custom verb → Normal', () => {
+      const result = service.classifyProtection(makeRaw({ subKeyName: 'myapp', command: 'myapp.exe "%1"' }));
+      expect(result.level).toBe(ItemProtectionLevel.Normal);
+    });
+  });
+
+  describe('classifyShellExtProtection', () => {
+    it('known system CLSID → Warning', () => {
+      const result = service.classifyShellExtProtection('{90AA3A4E-1CBA-4233-B8BB-535773D48449}');
+      expect(result.level).toBe(ItemProtectionLevel.Warning);
+    });
+
+    it('unknown CLSID → Normal', () => {
+      const result = service.classifyShellExtProtection('{12345678-1234-1234-1234-123456789abc}');
+      expect(result.level).toBe(ItemProtectionLevel.Normal);
+    });
+
+    it('case-insensitive CLSID matching', () => {
+      const result = service.classifyShellExtProtection('{90aa3a4e-1cba-4233-b8bb-535773d48449}');
+      expect(result.level).toBe(ItemProtectionLevel.Warning);
     });
   });
 

@@ -95,6 +95,21 @@
   .tag-system { background: #EEF0F3; color: #505050; }
   .tag-custom { background: #F3EFFE; color: #7B4BBA; }
   .tag-shellext { background: var(--warning-bg); color: var(--warning); }
+  .tag-extended { background: #E8EAF6; color: #3F51B5; font-size: 10px; }
+  .tag-subcmd { background: #E0F2F1; color: #00796B; font-size: 10px; padding: 1px 4px; }
+  .protected-row { opacity: 0.65; }
+  .fallback-name-tag { font-size: 10px; color: var(--text3); font-style: italic; margin-left: 6px; font-weight: normal; }
+  /* 分组 header */
+  .group-header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2); font-size: 12px; color: var(--text2); font-weight: 600; cursor: pointer; user-select: none; }
+  .group-header:hover { background: var(--bg); }
+  .group-header-system { background: rgba(159, 122, 234, 0.06); color: #5E4A99; }
+  .group-header-danger { background: var(--danger-bg); color: var(--danger); }
+  .group-arrow { width: 12px; display: inline-block; text-align: center; }
+  .group-count { margin-left: auto; background: var(--surface); border: 1px solid var(--border); padding: 1px 7px; border-radius: 10px; font-size: 11px; color: var(--text2); font-weight: normal; }
+  .group-header-danger .group-count { background: rgba(255,255,255,0.7); border-color: rgba(196,43,28,0.2); color: var(--danger); }
+  .dangerous-hidden-hint { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-top: 8px; background: var(--surface2); border: 1px dashed var(--border); border-radius: var(--radius-sm); font-size: 11px; color: var(--text2); cursor: pointer; }
+  .dangerous-hidden-hint:hover { background: var(--bg); color: var(--accent); }
+  .toggle-switch:disabled { opacity: 0.4; cursor: not-allowed; }
   .toggle-switch { width: 40px; height: 20px; border-radius: 10px; border: none; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; padding: 0; }
   .toggle-switch.on { background: var(--accent); }
   .toggle-switch.off { background: #BDBDBD; }
@@ -450,6 +465,34 @@
                 <button class="toggle-switch on" onclick="window._settingsPage.toggleSwitch(this)"><div class="toggle-thumb"></div></button>
               </div>
             </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label">显示高危系统条目</div>
+                <div class="setting-desc">默认隐藏会影响资源管理器正常工作的系统核心条目（如 open/properties 等核心 verb）；开启后将显示这些条目，但禁用它们可能导致桌面/资源管理器异常</div>
+              </div>
+              <div class="setting-control">
+                <button id="showDangerousToggle" class="toggle-switch off" onclick="window._settingsPage.toggleShowDangerous(this)"><div class="toggle-thumb"></div></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-header">右键菜单样式</div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-label">当前样式</div>
+                <div class="setting-desc" id="menuStyleCurrent">检测中…</div>
+              </div>
+              <div class="setting-control" style="display:flex;gap:8px;">
+                <button id="btnSetClassic" class="btn btn-secondary" onclick="window._settingsPage.switchMenuStyle('classic')">切换到 Win10 经典</button>
+                <button id="btnSetWin11" class="btn btn-secondary" onclick="window._settingsPage.switchMenuStyle('win11-new')">切换到 Win11 新版</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-desc" style="color:var(--warning);">⚠ 切换会重启资源管理器进程，未保存的文件资源管理器窗口会被关闭。本设置仅在 Windows 11 上有效。</div>
+              </div>
+            </div>
           </div>
 
           <div class="settings-section">
@@ -528,6 +571,7 @@
   <div class="statusbar-item">·</div>
   <div class="statusbar-item" id="sbCount">—</div>
   <div class="statusbar-spacer"></div>
+  <div class="statusbar-item" id="sbMenuStyle"></div>
   <div class="statusbar-item" id="sbLast"></div>
 </div>
 

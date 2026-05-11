@@ -14,6 +14,7 @@ const PS_EXE = fs.existsSync(PWSH7_PATH) ? PWSH7_PATH : 'powershell.exe';
 
 export class PowerShellBridge {
   private pending = 0;
+  // maxConcurrent=3：实测 5 反而拖慢，因多个 PS 进程同时做注册表 IO 互相争抢
   private maxConcurrent = 3;
   private readonly waitQueue: Array<() => void> = [];
 
@@ -68,7 +69,9 @@ export class PowerShellBridge {
       const { stdout, stderr } = await execFileAsync(
         PS_EXE,
         ['-NonInteractive', '-NoProfile', '-OutputFormat', 'Text', '-Command', utf8Script],
-        { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
+        // 90 秒上限，应对 Win11 24H2 部分系统注册表 IO 慢的情况；之前 30 秒会导致 File/Folder 等
+        // 大量 ShellExt 的场景超时被 SIGTERM 杀死，整个场景返回空
+        { maxBuffer: 10 * 1024 * 1024, timeout: 90000 }
       );
 
       if (stderr) {
@@ -164,40 +167,60 @@ ${script}
   }
 
   /**
-   * 构建扫描 Classic Shell 注册表路径的脚本
-   * 仅返回原始注册表值（MUIVerb/Default/LocalizedDisplayName），
-   * 不执行间接字符串解析。解析逻辑由 TypeScript 侧 ShellExtNameResolver 完成。
+   * 构建扫描 Classic Shell 注册表路径的脚本（支持多路径，单次 PS 进程）
+   * 使用 .NET Registry API 直接访问，比 PS Registry provider 快 10-100x，
+   * 对 Win11 24H2 等注册表 IO 慢的系统尤其关键。
    */
-  buildGetItemsScript(hkcrSubPath: string): string {
+  buildGetItemsScript(hkcrSubPaths: string[]): string {
+    const pathsLiteral = hkcrSubPaths.map(p => `'${p.replace(/'/g, "''")}'`).join(',');
     return `
 $ErrorActionPreference = 'SilentlyContinue'
-New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
-$basePath = 'HKCR:\\${hkcrSubPath}'
-if (-not (Test-Path -LiteralPath $basePath)) { Write-Output '[]'; exit }
-$subKeys = Get-ChildItem -LiteralPath $basePath | Where-Object { $_.PSIsContainer }
-$result = @($subKeys | ForEach-Object {
-  $key = $_
-  $keyName = $key.PSChildName
-  $iconPath = $key.GetValue('Icon')
-  $isEnabled = ($key.GetValue('LegacyDisable') -eq $null)
-  $commandSubKey = Join-Path $key.PSPath 'command'
-  $command = ''
-  if (Test-Path -LiteralPath $commandSubKey) {
-    $command = (Get-Item -LiteralPath $commandSubKey).GetValue('')
-    if (-not $command) { $command = '' }
+$scanPaths = @(${pathsLiteral})
+$root = [Microsoft.Win32.Registry]::ClassesRoot
+$result = New-Object System.Collections.ArrayList
+foreach ($subPath in $scanPaths) {
+  $base = $root.OpenSubKey($subPath, $false)
+  if (-not $base) { continue }
+  try {
+    foreach ($name in $base.GetSubKeyNames()) {
+      $sub = $base.OpenSubKey($name, $false)
+      if (-not $sub) { continue }
+      try {
+        $valueNames = $sub.GetValueNames()
+        $iconPath = $sub.GetValue('Icon')
+        $isEnabled = ($sub.GetValue('LegacyDisable', $null) -eq $null)
+        $command = ''
+        $cmdSub = $sub.OpenSubKey('command', $false)
+        if ($cmdSub) {
+          try { $command = [string]$cmdSub.GetValue('') } finally { $cmdSub.Close() }
+          if (-not $command) { $command = '' }
+        }
+        $hasSub = ($sub.GetValue('SubCommands', $null) -ne $null) -or ($sub.GetValue('ExtendedSubCommandsKey', $null) -ne $null)
+        $hasSupp = ($sub.GetValue('SuppressionPolicy', $null) -ne $null) -or ($sub.GetValue('SuppressionPolicyEx', $null) -ne $null)
+        $obj = [PSCustomObject]@{
+          subKeyName              = [string]$name
+          rawMUIVerb              = if ($sub.GetValue('MUIVerb')) { [string]$sub.GetValue('MUIVerb') } else { $null }
+          rawDefault              = if ($sub.GetValue('')) { [string]$sub.GetValue('') } else { $null }
+          rawLocalizedDisplayName = if ($sub.GetValue('LocalizedDisplayName')) { [string]$sub.GetValue('LocalizedDisplayName') } else { $null }
+          rawIcon                 = if ($iconPath) { [string]$iconPath } else { $null }
+          isEnabled               = [bool]$isEnabled
+          command                 = [string]$command
+          registryKey             = [string]($subPath + '\\' + $name)
+          hasExtended             = [bool]($valueNames -contains 'Extended')
+          hasSubCommands          = [bool]$hasSub
+          hasSuppression          = [bool]$hasSupp
+          hasProgrammaticAccessOnly = [bool]($valueNames -contains 'ProgrammaticAccessOnly')
+          hasHasLUAShield         = [bool]($valueNames -contains 'HasLUAShield')
+        }
+        [void]$result.Add($obj)
+      } finally {
+        $sub.Close()
+      }
+    }
+  } finally {
+    $base.Close()
   }
-  $regKey = '${hkcrSubPath}\\' + $keyName
-  [PSCustomObject]@{
-    subKeyName             = [string]$keyName
-    rawMUIVerb             = if ($key.GetValue('MUIVerb')) { [string]$key.GetValue('MUIVerb') } else { $null }
-    rawDefault             = if ($key.GetValue('')) { [string]$key.GetValue('') } else { $null }
-    rawLocalizedDisplayName = if ($key.GetValue('LocalizedDisplayName')) { [string]$key.GetValue('LocalizedDisplayName') } else { $null }
-    rawIcon                = if ($iconPath) { [string]$iconPath } else { $null }
-    isEnabled              = [bool]$isEnabled
-    command                = [string]$command
-    registryKey            = [string]$regKey
-  }
-})
+}
 $result | ConvertTo-Json -Compress -Depth 3
 `.trim();
   }
@@ -237,121 +260,108 @@ Write-Output '{"ok":true}'
   }
 
   /**
-   * 构建枚举 shellex\ContextMenuHandlers 下所有 Shell 扩展的脚本
-   * 仅读取原始注册表数据（键名、CLSID、LocalizedString、MUIVerb、DLL 路径等），
-   * 不执行名称解析。解析逻辑由 TypeScript 侧 ShellExtNameResolver 完成。
+   * 构建枚举 shellex\ContextMenuHandlers 下所有 Shell 扩展的脚本（支持多路径，单次 PS 进程）
+   * 使用 .NET Registry API 直接访问，比 PS Registry provider 快 10-100x。
+   * 仅读取原始注册表数据；名称解析由 TypeScript 侧 ShellExtNameResolver 完成。
    */
-  buildGetShellExtItemsScript(shellexSubPath: string): string {
+  buildGetShellExtItemsScript(shellexSubPaths: string[]): string {
+    const pathsLiteral = shellexSubPaths.map(p => `'${p.replace(/'/g, "''")}'`).join(',');
     return `
 $ErrorActionPreference = 'SilentlyContinue'
-New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT -ErrorAction SilentlyContinue | Out-Null
-$shellexPath = 'HKCR:\\${shellexSubPath}'
-if (-not (Test-Path -LiteralPath $shellexPath)) { Write-Output '[]'; exit }
-# 推导 sibling shell 路径
-$shellPath = $null
-if ($shellexPath -match '\\\\shellex\\\\ContextMenuHandlers$') {
-  $shellPath = $shellexPath -replace '\\\\shellex\\\\ContextMenuHandlers$', '\\shell'
+$scanPaths = @(${pathsLiteral})
+$root = [Microsoft.Win32.Registry]::ClassesRoot
+$result = New-Object System.Collections.ArrayList
+foreach ($subPath in $scanPaths) {
+  $shellexKey = $root.OpenSubKey($subPath, $false)
+  if (-not $shellexKey) { continue }
+  $shellPath = $null
+  if ($subPath -match '\\\\shellex\\\\ContextMenuHandlers$') {
+    $shellPath = $subPath -replace '\\\\shellex\\\\ContextMenuHandlers$', '\\shell'
+  }
+  try {
+    foreach ($handlerKeyName in $shellexKey.GetSubKeyNames()) {
+      $h = $shellexKey.OpenSubKey($handlerKeyName, $false)
+      if (-not $h) { continue }
+      try {
+        $defaultVal = [string]$h.GetValue('')
+        $cleanName  = $handlerKeyName -replace '^-+', ''
+        $actualClsid = $cleanName
+        if ($cleanName -notmatch '^\\{[0-9A-Fa-f-]+\\}$' -and
+            $defaultVal -match '^\\{[0-9A-Fa-f-]+\\}$') {
+          $actualClsid = $defaultVal
+        }
+        $clsidLocalizedString = $null
+        $clsidMUIVerb = $null
+        $clsidDefault = $null
+        $clsidIcon = $null
+        $dllPath = $null
+        if ($actualClsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
+          $clsidKey = $root.OpenSubKey('CLSID\\' + $actualClsid, $false)
+          if ($clsidKey) {
+            try {
+              $v = $clsidKey.GetValue('LocalizedString'); if ($v) { $clsidLocalizedString = [string]$v }
+              $v = $clsidKey.GetValue('MUIVerb'); if ($v) { $clsidMUIVerb = [string]$v }
+              $v = $clsidKey.GetValue(''); if ($v) { $clsidDefault = [string]$v }
+              $ip = $clsidKey.OpenSubKey('InprocServer32', $false)
+              if ($ip) {
+                try {
+                  $dllRaw = $ip.GetValue('')
+                  if ($dllRaw) { $dllPath = [Environment]::ExpandEnvironmentVariables([string]$dllRaw) }
+                } finally { $ip.Close() }
+              }
+              if (-not $clsidMUIVerb) {
+                $shSame = $clsidKey.OpenSubKey('Shell\\' + $cleanName, $false)
+                if ($shSame) {
+                  try {
+                    $v = $shSame.GetValue('MUIVerb'); if ($v) { $clsidMUIVerb = [string]$v }
+                  } finally { $shSame.Close() }
+                }
+              }
+              $ic = $clsidKey.OpenSubKey('DefaultIcon', $false)
+              if ($ic) {
+                try {
+                  $v = $ic.GetValue(''); if ($v) { $clsidIcon = [string]$v }
+                } finally { $ic.Close() }
+              }
+            } finally { $clsidKey.Close() }
+          }
+        }
+        $siblingMUIVerb = $null
+        if ($shellPath) {
+          $sib = $root.OpenSubKey($shellPath + '\\' + $cleanName, $false)
+          if ($sib) {
+            try {
+              $v = $sib.GetValue('MUIVerb'); if ($v) { $siblingMUIVerb = [string]$v }
+            } finally { $sib.Close() }
+          }
+        }
+        $isEnabled = -not $handlerKeyName.StartsWith('-')
+        $obj = [PSCustomObject]@{
+          handlerKeyName       = [string]$handlerKeyName
+          cleanName            = [string]$cleanName
+          defaultVal           = $defaultVal
+          isEnabled            = [bool]$isEnabled
+          actualClsid          = [string]$actualClsid
+          clsidLocalizedString = $clsidLocalizedString
+          clsidMUIVerb         = $clsidMUIVerb
+          clsidDefault         = $clsidDefault
+          clsidIcon            = $clsidIcon
+          dllPath              = $dllPath
+          dllFileDescription   = $null
+          dllProductName       = $null
+          progIdName           = $null
+          siblingMUIVerb       = $siblingMUIVerb
+          registryKey          = [string]($subPath + '\\' + $cleanName)
+        }
+        [void]$result.Add($obj)
+      } finally {
+        $h.Close()
+      }
+    }
+  } finally {
+    $shellexKey.Close()
+  }
 }
-$handlers = Get-ChildItem -LiteralPath $shellexPath | Where-Object { $_.PSIsContainer }
-$result = @($handlers | ForEach-Object {
-  $handlerKeyName = $_.PSChildName
-  $defaultVal  = $_.GetValue('')
-  $cleanName   = $handlerKeyName -replace '^-+', ''
-  $actualClsid = $cleanName
-  if ($cleanName -notmatch '^\\{[0-9A-Fa-f-]+\\}$' -and
-      $defaultVal -match '^\\{[0-9A-Fa-f-]+\\}$') {
-    $actualClsid = $defaultVal
-  }
-  # 读取 CLSID 子键原始值
-  $clsidLocalizedString = $null
-  $clsidMUIVerb = $null
-  $clsidDefault = $null
-  $dllPath = $null
-  if ($actualClsid -match '^\\{[0-9A-Fa-f-]+\\}$') {
-    $clsidPath = 'HKCR:\\CLSID\\' + $actualClsid
-    if (Test-Path -LiteralPath $clsidPath) {
-      $clsidKey = Get-Item -LiteralPath $clsidPath
-      if ($clsidKey.GetValue('LocalizedString')) { $clsidLocalizedString = [string]$clsidKey.GetValue('LocalizedString') }
-      if ($clsidKey.GetValue('MUIVerb')) { $clsidMUIVerb = [string]$clsidKey.GetValue('MUIVerb') }
-      if ($clsidKey.GetValue('')) { $clsidDefault = [string]$clsidKey.GetValue('') }
-      $inprocPath = $clsidPath + '\\InprocServer32'
-      if (Test-Path -LiteralPath $inprocPath) {
-        $dllRaw = (Get-Item -LiteralPath $inprocPath).GetValue('')
-        if ($dllRaw) { $dllPath = [System.Environment]::ExpandEnvironmentVariables($dllRaw) }
-      }
-      # CLSID\Shell 子键的 MUIVerb（COM 对象自身注册的 verb）
-      $clsidShellPath = $clsidPath + '\\Shell'
-      if (Test-Path -LiteralPath $clsidShellPath) {
-        Get-ChildItem -LiteralPath $clsidShellPath -ErrorAction SilentlyContinue | ForEach-Object {
-          $shellMv = $_.GetValue('MUIVerb')
-          if ($shellMv -and -not $clsidMUIVerb) { $clsidMUIVerb = [string]$shellMv }
-        }
-      }
-      # ProgID → 应用程序名（用于 Level 1.6）
-      $progIdVal = $clsidKey.GetValue('ProgID')
-      if ($progIdVal) {
-        $progIdPath = 'HKCR:\' + $progIdVal
-        if (Test-Path -LiteralPath $progIdPath) {
-          $progIdDef = (Get-Item -LiteralPath $progIdPath).GetValue('')
-          if ($progIdDef -and $progIdDef.Length -ge 2) { $progIdName = [string]$progIdDef }
-        }
-      }
-    }
-  }
-  # DLL 版本资源（.NET FileVersionInfo，天然支持 UI 语言，无需 koffi）
-  $dllFileDescription = $null
-  $dllProductName = $null
-  if ($dllPath -and (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
-    try {
-      $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dllPath)
-      if ($vi.FileDescription -and $vi.FileDescription.Length -ge 2) {
-        $dllFileDescription = [string]$vi.FileDescription
-      }
-      if ($vi.ProductName -and $vi.ProductName.Length -ge 2) {
-        $dllProductName = [string]$vi.ProductName
-      }
-    } catch {}
-  }
-  # sibling shell key MUIVerb
-  $siblingMUIVerb = $null
-  if ($shellPath) {
-    $siblingVerbPath = Join-Path $shellPath $cleanName
-    if (Test-Path -LiteralPath $siblingVerbPath) {
-      $smv = (Get-Item -LiteralPath $siblingVerbPath).GetValue('MUIVerb')
-      if ($smv) { $siblingMUIVerb = [string]$smv }
-    }
-    # 回退：反向扫描 shell verbs，查找 CommandStateHandler/DelegateExecute = $actualClsid
-    if (-not $siblingMUIVerb -and $actualClsid) {
-      Get-ChildItem -LiteralPath $shellPath -ErrorAction SilentlyContinue | ForEach-Object {
-        $csh = $_.GetValue('CommandStateHandler')
-        $de  = $_.GetValue('DelegateExecute')
-        $ech = $_.GetValue('ExplorerCommandHandler')
-        if (($csh -eq $actualClsid) -or ($de -eq $actualClsid) -or ($ech -eq $actualClsid)) {
-          $mv = $_.GetValue('MUIVerb')
-          if ($mv) { $siblingMUIVerb = [string]$mv }
-        }
-      }
-    }
-  }
-  $isEnabled = -not $handlerKeyName.StartsWith('-')
-  $regKey = '${shellexSubPath}\\' + $cleanName
-  [PSCustomObject]@{
-    handlerKeyName       = [string]$handlerKeyName
-    cleanName            = [string]$cleanName
-    defaultVal           = [string]$defaultVal
-    isEnabled            = [bool]$isEnabled
-    actualClsid          = [string]$actualClsid
-    clsidLocalizedString = $clsidLocalizedString
-    clsidMUIVerb         = $clsidMUIVerb
-    clsidDefault         = $clsidDefault
-    dllPath              = $dllPath
-    dllFileDescription   = $dllFileDescription
-    dllProductName       = $dllProductName
-    progIdName           = $progIdName
-    siblingMUIVerb       = $siblingMUIVerb
-    registryKey          = [string]$regKey
-  }
-})
 $result | ConvertTo-Json -Compress -Depth 3
 `.trim();
   }
@@ -363,21 +373,27 @@ $result | ConvertTo-Json -Compress -Depth 3
   buildCommandStoreScript(): string {
     return `
 $ErrorActionPreference = 'SilentlyContinue'
-$cmdStorePath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\CommandStore\\shell'
-$result = @()
-if (Test-Path -LiteralPath $cmdStorePath) {
-  Get-ChildItem -LiteralPath $cmdStorePath | ForEach-Object {
-    $handler = $_.GetValue('ExplorerCommandHandler')
-    if ($handler -and $handler -match '^\\{[0-9A-Fa-f-]+\\}$') {
-      $mv = $_.GetValue('MUIVerb')
-      if ($mv) {
-        [PSCustomObject]@{
-          clsid   = [string]$handler
-          muiverb = [string]$mv
+$result = New-Object System.Collections.ArrayList
+$cmdStore = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\CommandStore\\shell', $false)
+if ($cmdStore) {
+  try {
+    foreach ($name in $cmdStore.GetSubKeyNames()) {
+      $sub = $cmdStore.OpenSubKey($name, $false)
+      if (-not $sub) { continue }
+      try {
+        $handler = $sub.GetValue('ExplorerCommandHandler')
+        if ($handler -and $handler -match '^\\{[0-9A-Fa-f-]+\\}$') {
+          $mv = $sub.GetValue('MUIVerb')
+          if ($mv) {
+            [void]$result.Add([PSCustomObject]@{
+              clsid   = [string]$handler
+              muiverb = [string]$mv
+            })
+          }
         }
-      }
+      } finally { $sub.Close() }
     }
-  } | ForEach-Object { $result += $_ }
+  } finally { $cmdStore.Close() }
 }
 $result | ConvertTo-Json -Compress -Depth 2
 `.trim();

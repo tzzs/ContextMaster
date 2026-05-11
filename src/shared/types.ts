@@ -1,4 +1,4 @@
-import { MenuScene, MenuItemType, OperationType, BackupType } from './enums';
+import { MenuScene, MenuItemType, OperationType, BackupType, ItemProtectionLevel } from './enums';
 
 // IPC 统一返回包装
 export type IpcResult<T> =
@@ -16,7 +16,15 @@ export interface MenuItemEntry {
   menuScene: MenuScene;
   registryKey: string;
   type: MenuItemType;
-  dllPath?: string | null;   // 仅 ShellExt 类型有值，指向 InprocServer32 DLL
+  dllPath?: string | null;
+  protectionLevel: ItemProtectionLevel;
+  protectionReason?: string;
+  isExtended?: boolean;
+  hasSubCommands?: boolean;
+  /** name 是否回退自原始键名/cleanName（无任何本地化数据可用）—— UI 用于显示"原始键名"标签 */
+  nameFromFallback?: boolean;
+  /** 条目来源分类：系统内置 vs 第三方应用 */
+  origin?: 'system' | 'third-party';
 }
 
 // 操作记录
@@ -69,4 +77,11 @@ export interface ExportBackupParams {
 // 窗口尺寸信息
 export interface WindowInfo {
   isMaximized: boolean;
+}
+
+// 系统菜单样式信息
+export interface SystemMenuStyle {
+  osVersion: 'win10' | 'win11';
+  menuStyle: 'classic' | 'win11-new';
+  buildNumber: number;
 }

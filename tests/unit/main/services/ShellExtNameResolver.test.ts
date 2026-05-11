@@ -115,6 +115,16 @@ describe('ShellExtNameResolver', () => {
       // empty string skipped, '  ' has length >= 2 so used as-is
       expect(resolver.resolveClassicName(item)).toBe('  ');
     });
+
+    it('should fallback to rawDefault when indirect MUIVerb resolves to empty string', () => {
+      vi.mocked(win32.resolveIndirect).mockReturnValue(null);
+      const item = createClassicItem({
+        rawMUIVerb: '@broken.dll,-1',
+        rawDefault: 'FallbackDefault',
+        rawLocalizedDisplayName: null,
+      });
+      expect(resolver.resolveClassicName(item)).toBe('FallbackDefault');
+    });
   });
 
   // ---- Shell 扩展名称解析（多级回退） ----
@@ -262,6 +272,28 @@ describe('ShellExtNameResolver', () => {
         dllFileDescription: 'Vim Shell Extension',
       });
       expect(resolver.resolveExtName(item, cmdStore)).toBe('TestExt'); // fallback
+    });
+
+    it('Level 2.5: 应跳过长度 > 64 的 DLL FileDescription', () => {
+      const longDesc = 'A'.repeat(65);
+      const item = createShellExtItem({
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+        dllFileDescription: longDesc,
+      });
+      expect(resolver.resolveExtName(item, cmdStore)).toBe('TestExt');
+    });
+
+    it('Level 2.5: 应返回 ProductName 当 FileDescription 通过泛型过滤', () => {
+      const item = createShellExtItem({
+        clsidLocalizedString: null,
+        clsidMUIVerb: null,
+        clsidDefault: null,
+        dllFileDescription: null,
+        dllProductName: 'Visual Studio Code',
+      });
+      expect(resolver.resolveExtName(item, cmdStore)).toBe('Visual Studio Code');
     });
 
     // Level 3: directName plain string
